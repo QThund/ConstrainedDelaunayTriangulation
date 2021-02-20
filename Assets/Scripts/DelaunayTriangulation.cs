@@ -19,7 +19,7 @@ namespace Game.Utils.Geometry
         private TriangleRegistry m_triangles;
         private Stack<int> m_triangleStack;
 
-        public void Triangulation(List<Vector2> inputPoints, List<Triangle2D> outputTriangles, List<Vector2> constrainedEdges = null)
+        public void Triangulation(List<Vector2> inputPoints, List<Triangle2D> outputTriangles, List<List<Vector2>> constrainedEdges = null)
         {
             //Vector2 x; 
             //GeometryUtils.InsersectionBetweenLines(new Vector2(0.229538f, 0.254069f), new Vector2(0.239803f, 0.140073f), new Vector2(0.270452f, 0.206589f), new Vector2(0.217924f, 0.152985f), out x);
@@ -66,21 +66,26 @@ namespace Game.Utils.Geometry
             // CONSTRAINED EDGES
             if(constrainedEdges != null)
             {
-                List<Vector2> normalizedConstrainedEdges = new List<Vector2>(inputPoints.Count);
-                NormalizePoints(constrainedEdges, pointCloudBounds, normalizedConstrainedEdges);
-
-                // 1
-                for (int i = 0; i < normalizedConstrainedEdges.Count-0; ++i)
+                for(int i = 0; i < constrainedEdges.Count; ++i)
                 {
-                    if(normalizedConstrainedEdges[i] == normalizedConstrainedEdges[(i + 1) % normalizedConstrainedEdges.Count])
-                    {
-                        Debug.LogWarning($"The list of constrained edges contains a zero-length edge (2 consecutive coinciding points, indices {i} and {(i + 1) % normalizedConstrainedEdges.Count}). It will be ignored.");
-                        continue;
-                    }
+                    List<Vector2> normalizedConstrainedEdges = new List<Vector2>(inputPoints.Count);
+                    NormalizePoints(constrainedEdges[i], pointCloudBounds, normalizedConstrainedEdges);
 
-                    AddConstrainedEdgeToTriangulation(normalizedConstrainedEdges[i], normalizedConstrainedEdges[(i + 1) % normalizedConstrainedEdges.Count]);
+                    // 1
+                    for (int j = 0; j < normalizedConstrainedEdges.Count - 0; ++j)
+                    {
+                        if (normalizedConstrainedEdges[j] == normalizedConstrainedEdges[(j + 1) % normalizedConstrainedEdges.Count])
+                        {
+                            Debug.LogWarning($"The list of constrained edges contains a zero-length edge (2 consecutive coinciding points, indices {j} and {(j + 1) % normalizedConstrainedEdges.Count}). It will be ignored.");
+                            continue;
+                        }
+
+                        // TODO: Add all the points at the beginning and then work with their indices?
+
+                        AddConstrainedEdgeToTriangulation(normalizedConstrainedEdges[j], normalizedConstrainedEdges[(j + 1) % normalizedConstrainedEdges.Count]);
+                    }
                 }
-            }
+           }
 
             // Last: Remove supertriangle vertices and assure Delaunay triangulation in adjacent triangles
             // TODO

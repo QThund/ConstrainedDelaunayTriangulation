@@ -491,6 +491,10 @@ PolygonCollider2D:
       - {x: -1, y: 1}
       - {x: -1, y: -1}
       - {x: 7, y: -1}
+    - - {x: 7.07, y: 2}
+      - {x: 4.9, y: 2}
+      - {x: 4.98, y: 1}
+      - {x: 7.63, y: 1}
 --- !u!4 &1092558753
 Transform:
   m_ObjectHideFlags: 0
@@ -711,7 +715,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Collider: {fileID: 1712272035}
-  Edges: {fileID: 125614359}
+  Edges: {fileID: 1092558752}
   DrawTriangles: 1
 --- !u!4 &1498655074
 Transform:

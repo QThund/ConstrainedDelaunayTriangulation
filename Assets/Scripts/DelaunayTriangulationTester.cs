@@ -33,18 +33,17 @@ public class DelaunayTriangulationTester : MonoBehaviour
             pointsToTriangulate.AddRange(pathPoints);
         }
 
-        List<Vector2> edgePoints = null;
-        
-        if(Edges != null)
+        List<List<Vector2>> edgePoints = new List<List<Vector2>>();
+
+        if (Edges != null)
         {
-            edgePoints = new List<Vector2>();
             pathCount = Edges.pathCount;
 
             for (int i = 0; i < pathCount; ++i)
             {
-                pathPoints.Clear();
+                pathPoints = new List<Vector2>(pathPoints);
                 Edges.GetPath(i, pathPoints);
-                edgePoints.AddRange(pathPoints);
+                edgePoints.Add(pathPoints);
             }
         }
         
