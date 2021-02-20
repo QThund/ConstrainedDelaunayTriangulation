@@ -1,0 +1,136 @@
+
+using Game.Utils.Geometry;
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class DelaunayTriangulationTester : MonoBehaviour
+{
+    public PolygonCollider2D Collider;
+
+    public List<Triangle2D> Triangles;
+
+    public PolygonCollider2D Edges;
+
+    public bool DrawTriangles;
+
+    protected DelaunayTriangulation m_triangulation;
+
+    protected void RunTest()
+    {
+        Debug.Log("Running Delaunay triangulation test...");
+
+        int pathCount = Collider.pathCount;
+
+        List<Vector2> pointsToTriangulate = new List<Vector2>();
+        List<Vector2> pathPoints = new List<Vector2>();
+
+
+        for (int i = 0; i < pathCount; ++i)
+        {
+            pathPoints.Clear();
+            Collider.GetPath(i, pathPoints);
+            pointsToTriangulate.AddRange(pathPoints);
+        }
+
+        List<Vector2> edgePoints = null;
+        
+        if(Edges != null)
+        {
+            edgePoints = new List<Vector2>();
+            pathCount = Edges.pathCount;
+
+            for (int i = 0; i < pathCount; ++i)
+            {
+                pathPoints.Clear();
+                Edges.GetPath(i, pathPoints);
+                edgePoints.AddRange(pathPoints);
+            }
+        }
+        
+        Triangles = new List<Triangle2D>(pointsToTriangulate.Count / 3);
+        m_triangulation = new DelaunayTriangulation();
+        m_triangulation.Triangulation(pointsToTriangulate, Triangles, edgePoints);
+
+        Debug.Log("Test finished.");
+    }
+
+    private void OnDrawGizmos()
+    {
+        if(Triangles == null || !DrawTriangles)
+            return;
+
+        Color triangleColor = Color.black;
+
+        for(int i = 0; i < Triangles.Count; ++i)
+        {
+            Debug.DrawLine(Triangles[i].p0, Triangles[i].p1, triangleColor);
+            Debug.DrawLine(Triangles[i].p1, Triangles[i].p2, triangleColor);
+            Debug.DrawLine(Triangles[i].p2, Triangles[i].p0, triangleColor);
+        }
+    }
+
+#if UNITY_EDITOR
+
+    [UnityEditor.CustomEditor(typeof(DelaunayTriangulationTester))]
+    public class DelaunayTriangulationTesterInspector : UnityEditor.Editor
+    {
+        private int m_triangleToDraw = 0;
+        private int m_pointToDraw = 0;
+        private string m_triangleInfo;
+
+        public override void OnInspectorGUI()
+        {
+            base.OnInspectorGUI();
+
+            if(GUILayout.Button("Run test!"))
+            {
+                ((DelaunayTriangulationTester)target).RunTest();
+            }
+
+            if(((DelaunayTriangulationTester)target).m_triangulation == null)
+            {
+                return;
+            }
+
+            m_triangleToDraw = UnityEditor.EditorGUILayout.IntSlider(new GUIContent("Triangle:"), m_triangleToDraw, 0, ((DelaunayTriangulationTester)target).m_triangulation.TriangleStorage.TriangleCount);
+
+            UnityEditor.EditorGUILayout.LabelField(m_triangleInfo);
+
+            if (GUILayout.Button("Draw triangle"))
+            {
+                ((DelaunayTriangulationTester)target).DrawTriangle(m_triangleToDraw);
+
+                unsafe
+                {
+                    DelaunayTriangle triangle = ((DelaunayTriangulationTester)target).m_triangulation.TriangleStorage.GetTriangle(m_triangleToDraw);
+                    m_triangleInfo = "(" + triangle.p[0] + ", " + triangle.p[1] + ", " + triangle.p[2] + ")";
+                    ((DelaunayTriangulationTester)target).DrawPoint(triangle.p[0]);
+                }
+            }
+
+            m_pointToDraw = UnityEditor.EditorGUILayout.IntSlider(new GUIContent("Point:"), m_pointToDraw, 0, ((DelaunayTriangulationTester)target).m_triangulation.TriangleStorage.Points.Count - 1);
+
+            if (GUILayout.Button("Draw vertex"))
+            {
+                ((DelaunayTriangulationTester)target).DrawPoint(m_pointToDraw);
+            }
+        }
+    }
+
+    private void DrawPoint(int pointIndex)
+    {
+        Vector2 point = m_triangulation.TriangleStorage.GetPointByIndex(pointIndex);
+
+        Debug.DrawRay(point + Vector2.down * 0.02f * 0.5f, Vector2.up * 0.02f, Color.red, 10.0f);
+        Debug.DrawRay(point + Vector2.left * 0.02f * 0.5f, Vector2.right * 0.02f, Color.red, 10.0f);
+    }
+
+    private void DrawTriangle(int triangleIndex)
+    {
+        m_triangulation.TriangleStorage.DrawTriangle(triangleIndex);
+    }
+
+#endif
+
+}
