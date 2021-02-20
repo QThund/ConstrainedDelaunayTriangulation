@@ -66,10 +66,15 @@ namespace Game.Utils.Geometry
             // CONSTRAINED EDGES
             if(constrainedEdges != null)
             {
+                List<List<int>> constrainedEdgeIndices = new List<List<int>>();
+
+                // Adds all the points
                 for(int i = 0; i < constrainedEdges.Count; ++i)
                 {
                     List<Vector2> normalizedConstrainedEdges = new List<Vector2>(inputPoints.Count);
                     NormalizePoints(constrainedEdges[i], pointCloudBounds, normalizedConstrainedEdges);
+
+                    List<int> polygonEdgeIndices = new List<int>(normalizedConstrainedEdges.Count);
 
                     // 1
                     for (int j = 0; j < normalizedConstrainedEdges.Count - 0; ++j)
@@ -80,9 +85,20 @@ namespace Game.Utils.Geometry
                             continue;
                         }
 
-                        // TODO: Add all the points at the beginning and then work with their indices?
+                        int addedPointIndex = AddPointToTriangulation(normalizedConstrainedEdges[j], m_triangles);
+                        polygonEdgeIndices.Add(addedPointIndex);
 
-                        AddConstrainedEdgeToTriangulation(normalizedConstrainedEdges[j], normalizedConstrainedEdges[(j + 1) % normalizedConstrainedEdges.Count]);
+                        Debug.DrawLine(normalizedConstrainedEdges[j], normalizedConstrainedEdges[(j + 1) % normalizedConstrainedEdges.Count], Color.cyan, 5.0f);
+                    }
+
+                    constrainedEdgeIndices.Add(polygonEdgeIndices);
+                }
+
+                for(int i = 0; i < constrainedEdgeIndices.Count; ++i)
+                {
+                    for (int j = 0; j < constrainedEdgeIndices[i].Count - 0; ++j)
+                    {
+                        AddConstrainedEdgeToTriangulation(constrainedEdgeIndices[i][j], constrainedEdgeIndices[i][(j + 1) % constrainedEdgeIndices[i].Count]);
                     }
                 }
            }
@@ -128,6 +144,13 @@ namespace Game.Utils.Geometry
         {
             // Note: Adjacent triangle, opposite to the inserted point, is always at index 1
             // Note 2: Adjacent triangles are stored CCW automatically, their index matches the index of the first vertex in every edge, and it is known that vertices are stored CCW
+
+            int existingPointIndex = m_triangles.GetIndexOfPoint(pointToInsert);
+
+            if (existingPointIndex != -1)
+            {
+                return existingPointIndex;
+            }
 
             // 5
             int containingTriangleIndex = triangles.FindTriangleThatContainsPoint(pointToInsert, m_triangles.TriangleCount - 1);
@@ -272,14 +295,6 @@ namespace Game.Utils.Geometry
             //            
 
             // Only one vertex of each triangle is moved
-            /*int oppositeTriangleIndex = triangle.adjacent[1];
-            triangle.p[1] = oppositeTriangle.p[oppositeVertex];
-            oppositeTriangle.p[oppositeTriangleSharedEdgeVertex] = triangle.p[0];
-            oppositeTriangle.adjacent[oppositeTriangleSharedEdgeVertex] = triangle.adjacent[0];
-            triangle.adjacent[0] = oppositeTriangleIndex;
-            triangle.adjacent[1] = oppositeTriangle.adjacent[oppositeVertex];
-            oppositeTriangle.adjacent[oppositeVertex] = triangleIndex;
-            */
             int oppositeTriangleIndex = triangle.adjacent[(notInEdgeTriangleVertex + 1) % 3];
             triangle.p[(notInEdgeTriangleVertex + 1) % 3] = oppositeTriangle.p[oppositeVertex];
             oppositeTriangle.p[oppositeTriangleSharedEdgeVertex] = triangle.p[notInEdgeTriangleVertex];
@@ -303,30 +318,17 @@ namespace Game.Utils.Geometry
             }
         }
 
-        private void AddConstrainedEdgeToTriangulation(Vector2 edgeEndpointA, Vector2 edgeEndpointB) // edge should be expressed as vertex indices instead?
+        private void AddConstrainedEdgeToTriangulation(int endpointAIndex, int endpointBIndex)
         {
-            int endpointAIndex = m_triangles.GetIndexOfPoint(edgeEndpointA);
-
-            if (endpointAIndex == -1)
-            {
-                endpointAIndex = AddPointToTriangulation(edgeEndpointA, m_triangles);
-            }
-
-            int endpointBIndex = m_triangles.GetIndexOfPoint(edgeEndpointB);
-
-            if (endpointBIndex == -1)
-            {
-                endpointBIndex = AddPointToTriangulation(edgeEndpointB, m_triangles);
-            }
-
-            Debug.DrawLine(edgeEndpointA, edgeEndpointB, Color.cyan, 5.0f);
-  //return;
             // 2
             // Detects if the edge already exists
             if (m_triangles.FindTriangleThatContainsEdge(endpointAIndex, endpointBIndex).TriangleIndex != -1)
             {
                 return;
             }
+
+            Vector2 edgeEndpointA = m_triangles.GetPointByIndex(endpointAIndex);
+            Vector2 edgeEndpointB = m_triangles.GetPointByIndex(endpointBIndex);
 
             List<DelaunayTriangleEdge> intersectedTriangleEdges = new List<DelaunayTriangleEdge>();
             int triangleContainingA = m_triangles.FindTriangleThatContainsLineEndpoint(endpointAIndex, (edgeEndpointB - edgeEndpointA));
