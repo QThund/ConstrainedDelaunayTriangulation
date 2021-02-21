@@ -63,8 +63,10 @@ namespace Game.Utils.Geometry
                 }
             }
 
+            List<int> trianglesToRemove = new List<int>();
+
             // CONSTRAINED EDGES
-            if(constrainedEdges != null)
+            if (constrainedEdges != null)
             {
                 List<List<int>> constrainedEdgeIndices = new List<List<int>>();
 
@@ -101,43 +103,55 @@ namespace Game.Utils.Geometry
                         AddConstrainedEdgeToTriangulation(constrainedEdgeIndices[i][j], constrainedEdgeIndices[i][(j + 1) % constrainedEdgeIndices[i].Count]);
                     }
                 }
-           }
 
-            // Last: Remove supertriangle vertices and assure Delaunay triangulation in adjacent triangles
-            // TODO
-
-            // OUTPUT
-
-            // Gets the triangles that share the vertices of the supertriangle, which must be removed
-            List<int> leftoverTriangles = new List<int>();
-            m_triangles.GetTrianglesWithVertex(0, leftoverTriangles);
-            m_triangles.GetTrianglesWithVertex(1, leftoverTriangles);
-            m_triangles.GetTrianglesWithVertex(2, leftoverTriangles);
-
-            List<Vector2> denormalizedPoints = new List<Vector2>(m_triangles.TriangleCount * 3);
-            //DenormalizePoints(m_triangles.Points, pointCloudBounds, denormalizedPoints);
-            denormalizedPoints.AddRange(m_triangles.Points);
-
-            for (int i = 0; i < m_triangles.TriangleCount; ++i)
-            {
-                bool isLeftover = false;
-
-                for (int j = 0; j < leftoverTriangles.Count; ++j)
+                // Removes all the constrained triangles
+                for (int i = 0; i < constrainedEdgeIndices.Count; ++i)
                 {
-                    if(i == leftoverTriangles[j])
-                    {
-                        //isLeftover = true;
-                    }
-                }
-
-                if(!isLeftover)
-                {
-                    DelaunayTriangle triangle = m_triangles.GetTriangle(i);
-                    outputTriangles.Add(new Triangle2D(denormalizedPoints[triangle.p[0]], denormalizedPoints[triangle.p[1]], denormalizedPoints[triangle.p[2]]));
+                    m_triangles.GetTrianglesInPolygon(constrainedEdgeIndices[i], trianglesToRemove);
                 }
             }
 
+            // Last: Remove supertriangle vertices
+            GetSupertriangleTriangles(trianglesToRemove);
+
+            for (int i = 0; i < trianglesToRemove.Count; ++i)
+            {
+                m_triangles.DrawTriangle(trianglesToRemove[i], Color.red);
+            }
+
+            // OUTPUT
+
+            for(int i = 0; i < m_triangles.TriangleCount; ++i)
+            {
+                int j = 0;
+
+                for (; j < trianglesToRemove.Count; ++j)
+                {
+                    if(trianglesToRemove[j] == i)
+                    {
+                        break;
+                    }
+                }
+
+                if(j == trianglesToRemove.Count)
+                {
+                    outputTriangles.Add(m_triangles.GetTrianglePoints(i));
+                }
+            }
+            
             m_triangles.LogDump();
+        }
+
+        private void GetSupertriangleTriangles(List<int> outputTriangles)
+        {
+            for(int i = 0; i < 3; ++i) // Vertices of the supertriangle
+            {
+                List<int> trianglesThatShareVertex = new List<int>();
+
+                m_triangles.GetTrianglesWithVertex(i, trianglesThatShareVertex);
+
+                outputTriangles.AddRange(trianglesThatShareVertex);
+            }
         }
 
         private int AddPointToTriangulation(Vector2 pointToInsert, TriangleRegistry triangles)
@@ -348,10 +362,10 @@ namespace Game.Utils.Geometry
 //                    m_triangles.GetIntersectingTriangles(edgeEndpointA, edgeEndpointB, triangleContainingA, intersectedTriangleEdges);
                     m_triangles.GetIntersectingEdges(edgeEndpointA, edgeEndpointB, triangleContainingA, intersectedTriangleEdges);
                 }
-                else
+                /*else
                 {
                     m_triangles.GetIntersectingTriangles(edgeEndpointA, edgeEndpointB, intersectedTriangleEdges);
-                }
+                }*/
 
                 // 3
                 while (intersectedTriangleEdges.Count > 0 && !debugStop)

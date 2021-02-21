@@ -145,7 +145,7 @@ namespace Game.Utils.Geometry
 
             while (!isTriangleContainingBFound && traversedTriangles != TriangleCount)
             {
-                DrawTriangle(triangleIndex);
+                DrawTriangle(triangleIndex, Color.green);
 
                 isTriangleContainingBFound = true;
                 bool hasCrossedEdge = false;
@@ -207,6 +207,126 @@ namespace Game.Utils.Geometry
             }
         }
 
+        // This method assumes that the edges of the triangles to find were created using the same vertex order
+        public void GetTrianglesInPolygon(List<int> polygonOutline, List<int> outputTrianglesInPolygon)
+        {
+            Stack<int> adjacentTriangles = new Stack<int>();
+
+            for(int i = 0; i < polygonOutline.Count; ++i)
+            {
+                // For an edge, check which of the 2 triangles that share the edge is inside of the polygon
+                DelaunayTriangleEdge triangleEdge = FindTriangleThatContainsEdge(polygonOutline[i], polygonOutline[(i + 1) % polygonOutline.Count]);
+                /*bool isTriangleInsidePolygon = false;
+                
+                for(int j = 0; j < 3; ++j)
+                {
+                    for (int k = 0; k < polygonOutline.Count; ++k)
+                    {
+                        if(m_triangleVertices[triangleEdge.TriangleIndex * 3 + j] == polygonOutline[k])
+                        {
+                            isTriangleInsidePolygon = true;
+                            break;
+                        }
+                    }
+
+                    if (isTriangleInsidePolygon)
+                    {
+                        break;
+                    }
+                }
+
+                // If it's not one of them, then obviously it's the other one
+                if(!isTriangleInsidePolygon)
+                { 
+                    triangleEdge = FindTriangleThatContainsEdge(polygonOutline[(i + 1) % polygonOutline.Count], polygonOutline[i]);
+                }*/
+
+                // Adds the 2 adjacent triangles
+                adjacentTriangles.Push(m_adjacentTriangles[triangleEdge.TriangleIndex * 3 + (triangleEdge.EdgeIndex + 1) % 3]);
+                adjacentTriangles.Push(m_adjacentTriangles[triangleEdge.TriangleIndex * 3 + (triangleEdge.EdgeIndex + 2) % 3]);
+
+                outputTrianglesInPolygon.Add(triangleEdge.TriangleIndex);
+            }
+
+            // TODO: Clean the stack duplicates
+            //return;
+
+            while(adjacentTriangles.Count > 0)
+            {
+                int currentAdjacentTriangle = adjacentTriangles.Pop();
+                List<int> adjacentsAlreadyInPolygon = new List<int>();
+
+                bool isCurrentAdjacentTriangleAlreadyInPolygon = false;
+
+                for (int j = 0; j < outputTrianglesInPolygon.Count; ++j)
+                {
+                    if (currentAdjacentTriangle == outputTrianglesInPolygon[j])
+                    {
+                        isCurrentAdjacentTriangleAlreadyInPolygon = true;
+                    }
+                }
+
+                if(isCurrentAdjacentTriangleAlreadyInPolygon)
+                {
+                    continue;
+                }
+
+                for (int j = 0; j < 3; ++j)
+                {
+                    int currentAdjacentOfAdjacentTriangle = m_adjacentTriangles[currentAdjacentTriangle * 3 + j];
+
+                    // Checks how many adjacent triangles (of the adjacent triangle) are already in the list
+                    for (int k = 0; k < outputTrianglesInPolygon.Count; ++k)
+                    {
+                        if (currentAdjacentOfAdjacentTriangle == outputTrianglesInPolygon[k])
+                        {
+                            adjacentsAlreadyInPolygon.Add(currentAdjacentOfAdjacentTriangle);
+                            break;
+                        }
+                    }
+                }
+
+                // If a triangle has 2 or more adjacent triangles already in the list, it means it is also inside of the polygon
+                if (adjacentsAlreadyInPolygon.Count > 1)
+                {
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        int adjacentTriangleToAdd = m_adjacentTriangles[currentAdjacentTriangle * 3 + k];
+
+                        bool isAdjacentTriangleAlreadyInPolygon = false;
+
+                        for (int m = 0; m < adjacentsAlreadyInPolygon.Count; ++m)
+                        {
+                            if (adjacentTriangleToAdd == adjacentsAlreadyInPolygon[m])
+                            {
+                                isAdjacentTriangleAlreadyInPolygon = true;
+                                break;
+                            }
+                        }
+
+                        if (!isAdjacentTriangleAlreadyInPolygon)
+                        {
+                            for (int m = 0; m < outputTrianglesInPolygon.Count; ++m)
+                            {
+                                if (adjacentTriangleToAdd == outputTrianglesInPolygon[m])
+                                {
+                                    isAdjacentTriangleAlreadyInPolygon = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!isAdjacentTriangleAlreadyInPolygon)
+                        {
+                            adjacentTriangles.Push(adjacentTriangleToAdd);
+                        }
+
+                        outputTrianglesInPolygon.Add(currentAdjacentTriangle);
+                    }
+                }
+            }
+        }
+
         public void GetIntersectingEdges(Vector2 edgeEndpointA, Vector2 edgeEndpointB, int startTriangle, List<DelaunayTriangleEdge> intersectingEdges)
         {
             Debug.Log("Edge to intersect: " + edgeEndpointA.ToString("F6") + " || " + edgeEndpointB.ToString("F6"));
@@ -217,7 +337,7 @@ namespace Game.Utils.Geometry
 
             while (!isTriangleContainingBFound && traversedTriangles != TriangleCount)
             {
-                DrawTriangle(triangleIndex);
+                DrawTriangle(triangleIndex, Color.green);
 
                 isTriangleContainingBFound = true;
                 bool hasCrossedEdge = false;
@@ -463,11 +583,11 @@ namespace Game.Utils.Geometry
             }
         }
 
-        public void DrawTriangle(int triangleIndex)
+        public void DrawTriangle(int triangleIndex, Color color)
         {
             for(int i = 0; i < 3; ++i)
             {
-                Debug.DrawLine(m_points[m_triangleVertices[triangleIndex * 3 + i]], m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]], Color.green, 10.0f);
+                Debug.DrawLine(m_points[m_triangleVertices[triangleIndex * 3 + i]], m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]], color, 10.0f);
             }
         }
 

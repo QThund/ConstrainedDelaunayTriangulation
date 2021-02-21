@@ -14,6 +14,8 @@ public class DelaunayTriangulationTester : MonoBehaviour
 
     public bool DrawTriangles;
 
+    public MeshFilter Representation;
+
     protected DelaunayTriangulation m_triangulation;
 
     protected void RunTest()
@@ -50,6 +52,25 @@ public class DelaunayTriangulationTester : MonoBehaviour
         Triangles = new List<Triangle2D>(pointsToTriangulate.Count / 3);
         m_triangulation = new DelaunayTriangulation();
         m_triangulation.Triangulation(pointsToTriangulate, Triangles, edgePoints);
+
+        List<Vector3> vertices = new List<Vector3>(Triangles.Count * 3);
+        List<int> indices = new List<int>(Triangles.Count * 3);
+
+        for(int i = 0; i < Triangles.Count; ++i)
+        {
+            vertices.Add(Triangles[i].p0);
+            vertices.Add(Triangles[i].p1);
+            vertices.Add(Triangles[i].p2);
+            indices.Add(i * 3 + 2); // Changes order
+            indices.Add(i * 3 + 1);
+            indices.Add(i * 3);
+        }
+
+        Mesh mesh = new Mesh();
+        mesh.subMeshCount = 1;
+        mesh.SetVertices(vertices);
+        mesh.SetIndices(indices, MeshTopology.Triangles, 0);
+        Representation.mesh = mesh;
 
         Debug.Log("Test finished.");
     }
@@ -92,7 +113,7 @@ public class DelaunayTriangulationTester : MonoBehaviour
                 return;
             }
 
-            m_triangleToDraw = UnityEditor.EditorGUILayout.IntSlider(new GUIContent("Triangle:"), m_triangleToDraw, 0, ((DelaunayTriangulationTester)target).m_triangulation.TriangleStorage.TriangleCount);
+            m_triangleToDraw = UnityEditor.EditorGUILayout.IntSlider(new GUIContent("Triangle:"), m_triangleToDraw, 0, ((DelaunayTriangulationTester)target).m_triangulation.TriangleStorage.TriangleCount - 1);
 
             UnityEditor.EditorGUILayout.LabelField(m_triangleInfo);
 
@@ -127,7 +148,7 @@ public class DelaunayTriangulationTester : MonoBehaviour
 
     private void DrawTriangle(int triangleIndex)
     {
-        m_triangulation.TriangleStorage.DrawTriangle(triangleIndex);
+        m_triangulation.TriangleStorage.DrawTriangle(triangleIndex, Color.green);
     }
 
 #endif
