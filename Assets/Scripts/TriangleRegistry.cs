@@ -208,122 +208,98 @@ namespace Game.Utils.Geometry
         }
 
         // This method assumes that the edges of the triangles to find were created using the same vertex order
+        // It also assumes all triangles are inside a supertriangle, so no adjacent triangles are -1
         public void GetTrianglesInPolygon(List<int> polygonOutline, List<int> outputTrianglesInPolygon)
         {
             Stack<int> adjacentTriangles = new Stack<int>();
 
-            for(int i = 0; i < polygonOutline.Count; ++i)
+            // First it gets all the triangles of the outline
+            for (int i = 0; i < polygonOutline.Count; ++i)
             {
-                // For an edge, check which of the 2 triangles that share the edge is inside of the polygon
+                // For every edge, it gets the inner triangle that contains such edge
                 DelaunayTriangleEdge triangleEdge = FindTriangleThatContainsEdge(polygonOutline[i], polygonOutline[(i + 1) % polygonOutline.Count]);
-                /*bool isTriangleInsidePolygon = false;
-                
-                for(int j = 0; j < 3; ++j)
-                {
-                    for (int k = 0; k < polygonOutline.Count; ++k)
-                    {
-                        if(m_triangleVertices[triangleEdge.TriangleIndex * 3 + j] == polygonOutline[k])
-                        {
-                            isTriangleInsidePolygon = true;
-                            break;
-                        }
-                    }
 
-                    if (isTriangleInsidePolygon)
-                    {
-                        break;
-                    }
-                }
-
-                // If it's not one of them, then obviously it's the other one
-                if(!isTriangleInsidePolygon)
-                { 
-                    triangleEdge = FindTriangleThatContainsEdge(polygonOutline[(i + 1) % polygonOutline.Count], polygonOutline[i]);
-                }*/
-
-                // Adds the 2 adjacent triangles
-                adjacentTriangles.Push(m_adjacentTriangles[triangleEdge.TriangleIndex * 3 + (triangleEdge.EdgeIndex + 1) % 3]);
-                adjacentTriangles.Push(m_adjacentTriangles[triangleEdge.TriangleIndex * 3 + (triangleEdge.EdgeIndex + 2) % 3]);
-
-                outputTrianglesInPolygon.Add(triangleEdge.TriangleIndex);
-            }
-
-            // TODO: Clean the stack duplicates
-            //return;
-
-            while(adjacentTriangles.Count > 0)
-            {
-                int currentAdjacentTriangle = adjacentTriangles.Pop();
-                List<int> adjacentsAlreadyInPolygon = new List<int>();
-
-                bool isCurrentAdjacentTriangleAlreadyInPolygon = false;
-
-                for (int j = 0; j < outputTrianglesInPolygon.Count; ++j)
-                {
-                    if (currentAdjacentTriangle == outputTrianglesInPolygon[j])
-                    {
-                        isCurrentAdjacentTriangleAlreadyInPolygon = true;
-                    }
-                }
-
-                if(isCurrentAdjacentTriangleAlreadyInPolygon)
+                // A triangle may form a corner, with 2 outline edges, this avoids adding it twice
+                if(outputTrianglesInPolygon.Contains(triangleEdge.TriangleIndex))
                 {
                     continue;
                 }
 
+                outputTrianglesInPolygon.Add(triangleEdge.TriangleIndex);
+
+                int adjacentTriangle1 = m_adjacentTriangles[triangleEdge.TriangleIndex * 3 + (triangleEdge.EdgeIndex + 1) % 3];
+                bool isAdjacentTriangleInOutline = false;
+
+                for(int j = 0; j < 3; ++j)
+                {
+                    // Compares the contiguous edges, to the right and to the left, (flipped) with the adjacent triangle's edges
+                    if ((m_triangleVertices[adjacentTriangle1 * 3 + (j + 1) % 3] == polygonOutline[(i + 1) % polygonOutline.Count] &&
+                         m_triangleVertices[adjacentTriangle1 * 3 + j] == polygonOutline[(i + 2) % polygonOutline.Count])
+                        ||
+                        (m_triangleVertices[adjacentTriangle1 * 3 + (j + 1) % 3] == polygonOutline[(i + polygonOutline.Count - 1) % polygonOutline.Count] &&
+                         m_triangleVertices[adjacentTriangle1 * 3 + j] == polygonOutline[(i + polygonOutline.Count) % polygonOutline.Count]))
+                    {
+                        Debug.LogWarning("!!!!" + adjacentTriangle1);
+                        isAdjacentTriangleInOutline = true;
+                    }
+                }
+
+                if (!isAdjacentTriangleInOutline && !outputTrianglesInPolygon.Contains(adjacentTriangle1))
+                {
+                    Debug.Log(triangleEdge.TriangleIndex + ". [" + i + "] Adjacent: " + adjacentTriangle1);
+                    adjacentTriangles.Push(adjacentTriangle1);
+                }
+
+                int adjacentTriangle2 = m_adjacentTriangles[triangleEdge.TriangleIndex * 3 + (triangleEdge.EdgeIndex + 2) % 3];
+                isAdjacentTriangleInOutline = false;
+
                 for (int j = 0; j < 3; ++j)
                 {
-                    int currentAdjacentOfAdjacentTriangle = m_adjacentTriangles[currentAdjacentTriangle * 3 + j];
-
-                    // Checks how many adjacent triangles (of the adjacent triangle) are already in the list
-                    for (int k = 0; k < outputTrianglesInPolygon.Count; ++k)
+                    // Compares the contiguous edges, to the right and to the left, (flipped) with the adjacent triangle's edges
+                    if ((m_triangleVertices[adjacentTriangle2 * 3 + (j + 1) % 3] == polygonOutline[(i + 1) % polygonOutline.Count] &&
+                         m_triangleVertices[adjacentTriangle2 * 3 + j] == polygonOutline[(i + 2) % polygonOutline.Count])
+                        ||
+                        (m_triangleVertices[adjacentTriangle2 * 3 + (j + 1) % 3] == polygonOutline[(i + polygonOutline.Count - 1) % polygonOutline.Count] &&
+                         m_triangleVertices[adjacentTriangle2 * 3 + j] == polygonOutline[(i + polygonOutline.Count) % polygonOutline.Count]))
                     {
-                        if (currentAdjacentOfAdjacentTriangle == outputTrianglesInPolygon[k])
-                        {
-                            adjacentsAlreadyInPolygon.Add(currentAdjacentOfAdjacentTriangle);
-                            break;
-                        }
+                        Debug.LogWarning("!!!!" + adjacentTriangle2);
+                        isAdjacentTriangleInOutline = true;
                     }
                 }
 
-                // If a triangle has 2 or more adjacent triangles already in the list, it means it is also inside of the polygon
-                if (adjacentsAlreadyInPolygon.Count > 1)
+                if (!isAdjacentTriangleInOutline && !outputTrianglesInPolygon.Contains(adjacentTriangle2))
                 {
-                    for (int k = 0; k < 3; ++k)
+                    Debug.Log(triangleEdge.TriangleIndex + ". [" + i + "] Adjacent: " + adjacentTriangle2);
+                    adjacentTriangles.Push(adjacentTriangle2);
+                }
+            }
+            //return;
+
+            // Then it propagates by adjacency, stopping when an adjacent triangle has already been included in the list
+            // Since all the outline triangles have been added previously, it will not propagate outside of the polygon
+            while(adjacentTriangles.Count > 0)
+            {
+                int currentTriangle = adjacentTriangles.Pop();
+
+                // The triangle may have been added already in a previous iteration
+                if(outputTrianglesInPolygon.Contains(currentTriangle))
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < 3; ++i)
+                {
+                    Debug.Log(currentTriangle);
+                    int adjacentTriangle = m_adjacentTriangles[currentTriangle * 3 + i];
+
+                    if (!outputTrianglesInPolygon.Contains(adjacentTriangle))
                     {
-                        int adjacentTriangleToAdd = m_adjacentTriangles[currentAdjacentTriangle * 3 + k];
-
-                        bool isAdjacentTriangleAlreadyInPolygon = false;
-
-                        for (int m = 0; m < adjacentsAlreadyInPolygon.Count; ++m)
-                        {
-                            if (adjacentTriangleToAdd == adjacentsAlreadyInPolygon[m])
-                            {
-                                isAdjacentTriangleAlreadyInPolygon = true;
-                                break;
-                            }
-                        }
-
-                        if (!isAdjacentTriangleAlreadyInPolygon)
-                        {
-                            for (int m = 0; m < outputTrianglesInPolygon.Count; ++m)
-                            {
-                                if (adjacentTriangleToAdd == outputTrianglesInPolygon[m])
-                                {
-                                    isAdjacentTriangleAlreadyInPolygon = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!isAdjacentTriangleAlreadyInPolygon)
-                        {
-                            adjacentTriangles.Push(adjacentTriangleToAdd);
-                        }
-
-                        outputTrianglesInPolygon.Add(currentAdjacentTriangle);
+                        Debug.Log(currentTriangle + " [" + i + "] Adjacent: " + adjacentTriangle);
+                        adjacentTriangles.Push(adjacentTriangle);
                     }
                 }
+                        
+                outputTrianglesInPolygon.Add(currentTriangle);
             }
         }
 

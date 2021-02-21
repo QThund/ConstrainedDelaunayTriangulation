@@ -109,6 +109,9 @@ namespace Game.Utils.Geometry
                 {
                     m_triangles.GetTrianglesInPolygon(constrainedEdgeIndices[i], trianglesToRemove);
                 }
+
+                // Remove all the triangles left that are not part of the main cloud
+                // TODO: How?
             }
 
             // Last: Remove supertriangle vertices
@@ -120,6 +123,8 @@ namespace Game.Utils.Geometry
             }
 
             // OUTPUT
+            List<Vector2> denormalizedPoints = new List<Vector2>(m_triangles.TriangleCount);
+            DenormalizePoints(m_triangles.Points, pointCloudBounds, denormalizedPoints);
 
             for(int i = 0; i < m_triangles.TriangleCount; ++i)
             {
@@ -133,9 +138,10 @@ namespace Game.Utils.Geometry
                     }
                 }
 
-                if(j == trianglesToRemove.Count)
+                if(j == trianglesToRemove.Count) // The triangle is not in the "To Remove" list
                 {
-                    outputTriangles.Add(m_triangles.GetTrianglePoints(i));
+                    DelaunayTriangle triangle = m_triangles.GetTriangle(i);
+                    outputTriangles.Add(new Triangle2D(denormalizedPoints[triangle.p[0]], denormalizedPoints[triangle.p[1]], denormalizedPoints[triangle.p[2]]));
                 }
             }
             
