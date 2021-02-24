@@ -1,18 +1,22 @@
-
-using Game.Utils.Algebra;
-using System.Collections.Generic;
 using UnityEngine;
 
-namespace Game.Utils.Geometry
+namespace Game.Utils.Math
 {
-    public static class GeometryUtils
+	public static class MathUtils
     {
+		public static float CalculateMatrix3x3Determinant(float m00, float m10, float m20,
+												  float m01, float m11, float m21,
+												  float m02, float m12, float m22)
+		{
+			return m00 * m11 * m22 + m10 * m21 * m02 + m20 * m01 * m12 - m20 * m11 * m02 - m10 * m01 * m22 - m00 * m21 * m12;
+		}
+
 		public static bool IsPointToTheRightOfEdge(Vector2 edgeEndpointA, Vector2 edgeEndpointB, Vector2 point)
         {
 			Vector2 aToB = edgeEndpointB - edgeEndpointA;
 			Vector2 aToP = point - edgeEndpointA;
 			Vector3 ab_x_p = Vector3.Cross(aToB, aToP);
-			return ab_x_p.z < -0.0001f; // Note: Due to extremely small negative values were causing wrong results, a tolerance is used
+			return ab_x_p.z < -0.0001f; // Note: Due to extremely small negative values were causing wrong results, a tolerance is used instead of zero
 		}
 
 		public static bool IsPointInsideTriangle(Vector2 triangleP0, Vector2 triangleP1, Vector2 triangleP2, Vector2 pointToCheck)
@@ -25,16 +29,16 @@ namespace Game.Utils.Geometry
 		}
 
 		// https://gamedev.stackexchange.com/questions/71328/how-can-i-add-and-subtract-convex-polygons
-		public static bool IsPointInsideCircumcircle(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 pointToChecl)
+		public static bool IsPointInsideCircumcircle(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 pointToCheck)
 		{
 			// This first part will simplify how we calculate the determinant
-			float a = p0.x - pointToChecl.x;
-			float d = p1.x - pointToChecl.x;
-			float g = p2.x - pointToChecl.x;
+			float a = p0.x - pointToCheck.x;
+			float d = p1.x - pointToCheck.x;
+			float g = p2.x - pointToCheck.x;
 
-			float b = p0.y - pointToChecl.y;
-			float e = p1.y - pointToChecl.y;
-			float h = p2.y - pointToChecl.y;
+			float b = p0.y - pointToCheck.y;
+			float e = p1.y - pointToCheck.y;
+			float h = p2.y - pointToCheck.y;
 
 			float c = a * a + b * b;
 			float f = d * d + e * e;
@@ -127,9 +131,9 @@ namespace Game.Utils.Geometry
 
 		public static bool IsTriangleVerticesCW(Vector2 point0, Vector2 point1, Vector2 point2)
         {
-			return AlgebraUtils.CalculateMatrix3x3Determinant(point0.x, point0.y, 1.0f,
-															  point1.x, point1.y, 1.0f,
-															  point2.x, point2.y, 1.0f) < 0.0f;
+			return CalculateMatrix3x3Determinant(point0.x, point0.y, 1.0f,
+												 point1.x, point1.y, 1.0f,
+												 point2.x, point2.y, 1.0f) < 0.0f;
 		}
 
 		//Is a quadrilateral convex? Assume no 3 points are colinear and the shape doesnt look like an hourglass

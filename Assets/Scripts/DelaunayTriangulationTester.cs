@@ -1,6 +1,5 @@
 
-using Game.Utils.Geometry;
-using System;
+using Game.Utils.Math;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -16,51 +15,92 @@ public class DelaunayTriangulationTester : MonoBehaviour
 
     public MeshFilter Representation;
 
+    public CompositeCollider2D TilemapFullRectCollider;
+
+    public CompositeCollider2D TilemapCollider;
+
     protected DelaunayTriangulation m_triangulation;
 
-    protected void RunTest()
+    protected void RunTestPolygonColliders()
     {
         Debug.Log("Running Delaunay triangulation test...");
 
-        int pathCount = Collider.pathCount;
-
         List<Vector2> pointsToTriangulate = new List<Vector2>();
-        List<Vector2> pathPoints = new List<Vector2>();
+        ExtractPointsFromCollider(Collider, pointsToTriangulate);
 
-
-        for (int i = 0; i < pathCount; ++i)
-        {
-            pathPoints.Clear();
-            Collider.GetPath(i, pathPoints);
-            pointsToTriangulate.AddRange(pathPoints);
-        }
-
-        List<List<Vector2>> edgePoints = new List<List<Vector2>>();
+        List<List<Vector2>> constrainedEdgePoints = new List<List<Vector2>>();
 
         if (Edges != null)
         {
-            pathCount = Edges.pathCount;
-
-            for (int i = 0; i < pathCount; ++i)
-            {
-                pathPoints = new List<Vector2>(pathPoints);
-                Edges.GetPath(i, pathPoints);
-                edgePoints.Add(pathPoints);
-            }
+            ExtractPointsFromCollider(Edges, constrainedEdgePoints);
         }
-        
+
         Triangles = new List<Triangle2D>(pointsToTriangulate.Count / 3);
         m_triangulation = new DelaunayTriangulation();
-        m_triangulation.Triangulation(pointsToTriangulate, Triangles, edgePoints);
+        m_triangulation.Triangulation(pointsToTriangulate, Triangles, constrainedEdgePoints);
 
-        List<Vector3> vertices = new List<Vector3>(Triangles.Count * 3);
-        List<int> indices = new List<int>(Triangles.Count * 3);
+        Representation.mesh = CreateMeshFromTriangles(Triangles);
 
-        for(int i = 0; i < Triangles.Count; ++i)
+        Debug.Log("Test finished.");
+    }
+
+    protected void RunTestTilemapColliders()
+    {
+        Debug.Log("Running Delaunay triangulation test...");
+
+        List<Vector2> pointsToTriangulate = new List<Vector2>();
+        ExtractPointsFromCollider(TilemapFullRectCollider, pointsToTriangulate);
+
+        List<List<Vector2>> constrainedEdgePoints = new List<List<Vector2>>();
+
+        if (TilemapCollider != null)
         {
-            vertices.Add(Triangles[i].p0);
-            vertices.Add(Triangles[i].p1);
-            vertices.Add(Triangles[i].p2);
+            ExtractPointsFromCollider(TilemapCollider, constrainedEdgePoints);
+        }
+
+        Triangles = new List<Triangle2D>(pointsToTriangulate.Count / 3);
+        m_triangulation = new DelaunayTriangulation();
+        m_triangulation.Triangulation(pointsToTriangulate, Triangles, constrainedEdgePoints);
+
+        Representation.mesh = CreateMeshFromTriangles(Triangles);
+
+        Debug.Log("Test finished.");
+    }
+
+    private void ExtractPointsFromCollider(CompositeCollider2D collider, List<Vector2> outputPoints)
+    {
+        int pathCount = collider.pathCount;
+
+        for (int i = 0; i < pathCount; ++i)
+        {
+            List<Vector2> pathPoints = new List<Vector2>();
+            collider.GetPath(i, pathPoints);
+            outputPoints.AddRange(pathPoints);
+        }
+    }
+
+    private void ExtractPointsFromCollider(CompositeCollider2D collider, List<List<Vector2>> outpuColliderPolygons)
+    {
+        int pathCount = collider.pathCount;
+
+        for (int i = 0; i < pathCount; ++i)
+        {
+            List<Vector2> pathPoints = new List<Vector2>();
+            collider.GetPath(i, pathPoints);
+            outpuColliderPolygons.Add(pathPoints);
+        }
+    }
+
+    private Mesh CreateMeshFromTriangles(List<Triangle2D> triangles)
+    {
+        List<Vector3> vertices = new List<Vector3>(triangles.Count * 3);
+        List<int> indices = new List<int>(triangles.Count * 3);
+
+        for (int i = 0; i < triangles.Count; ++i)
+        {
+            vertices.Add(triangles[i].p0);
+            vertices.Add(triangles[i].p1);
+            vertices.Add(triangles[i].p2);
             indices.Add(i * 3 + 2); // Changes order
             indices.Add(i * 3 + 1);
             indices.Add(i * 3);
@@ -70,9 +110,31 @@ public class DelaunayTriangulationTester : MonoBehaviour
         mesh.subMeshCount = 1;
         mesh.SetVertices(vertices);
         mesh.SetIndices(indices, MeshTopology.Triangles, 0);
-        Representation.mesh = mesh;
+        return mesh;
+    }
 
-        Debug.Log("Test finished.");
+    private void ExtractPointsFromCollider(PolygonCollider2D collider, List<Vector2> outputPoints)
+    {
+        int pathCount = collider.pathCount;
+
+        for (int i = 0; i < pathCount; ++i)
+        {
+            List<Vector2> pathPoints = new List<Vector2>();
+            Collider.GetPath(i, pathPoints);
+            outputPoints.AddRange(pathPoints);
+        }
+    }
+
+    private void ExtractPointsFromCollider(PolygonCollider2D collider, List<List<Vector2>> outpuColliderPolygons)
+    {
+        int pathCount = collider.pathCount;
+
+        for (int i = 0; i < pathCount; ++i)
+        {
+            List<Vector2> pathPoints = new List<Vector2>();
+            Edges.GetPath(i, pathPoints);
+            outpuColliderPolygons.Add(pathPoints);
+        }
     }
 
     private void OnDrawGizmos()
@@ -103,12 +165,17 @@ public class DelaunayTriangulationTester : MonoBehaviour
         {
             base.OnInspectorGUI();
 
-            if(GUILayout.Button("Run test!"))
+            if(GUILayout.Button("Run test PolygonColliders!"))
             {
-                ((DelaunayTriangulationTester)target).RunTest();
+                ((DelaunayTriangulationTester)target).RunTestPolygonColliders();
             }
 
-            if(((DelaunayTriangulationTester)target).m_triangulation == null)
+            if (GUILayout.Button("Run test TilemapColliders!"))
+            {
+                ((DelaunayTriangulationTester)target).RunTestTilemapColliders();
+            }
+
+            if (((DelaunayTriangulationTester)target).m_triangulation == null)
             {
                 return;
             }

@@ -1,9 +1,6 @@
-
-using Game.Utils.Algebra;
-using System;
 using UnityEngine;
 
-namespace Game.Utils.Geometry
+namespace Game.Utils.Math
 {
     public struct Triangle2D
     {
@@ -28,18 +25,6 @@ namespace Game.Utils.Geometry
             }
         }
 
-        // p0 is not moved
-        public void SortVerticesCCW()
-        {
-            // If clockwise...
-            if(GeometryUtils.IsTriangleVerticesCW(p0, p1, p2))
-            {
-                // Flips 2 vertices to sort them CCW
-                Vector2 temp = p1;
-                p1 = p2;
-                p2 = temp;
-            }
-        }
     }
 }
 

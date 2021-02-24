@@ -1,5 +1,5 @@
 
-namespace Game.Utils.Geometry
+namespace Game.Utils.Math
 {
     public struct DelaunayTriangleEdge
     {

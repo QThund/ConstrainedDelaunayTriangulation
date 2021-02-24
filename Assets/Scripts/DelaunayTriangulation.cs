@@ -1,13 +1,11 @@
-
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Game.Utils.Geometry
+namespace Game.Utils.Math
 {
     public unsafe class DelaunayTriangulation
     {
-        public TriangleRegistry TriangleStorage
+        public DelaunayTriangleSet TriangleStorage
         {
             get
             {
@@ -16,17 +14,17 @@ namespace Game.Utils.Geometry
         }
 
         private PointBinGrid m_grid;
-        private TriangleRegistry m_triangles;
+        private DelaunayTriangleSet m_triangles;
         private Stack<int> m_triangleStack;
+
+        private const int NOT_FOUND = -1;
+        private const int NO_ADJACENT_TRIANGLE = -1;
 
         public void Triangulation(List<Vector2> inputPoints, List<Triangle2D> outputTriangles, List<List<Vector2>> constrainedEdges = null)
         {
-            //Vector2 x; 
-            //GeometryUtils.InsersectionBetweenLines(new Vector2(0.229538f, 0.254069f), new Vector2(0.239803f, 0.140073f), new Vector2(0.270452f, 0.206589f), new Vector2(0.217924f, 0.152985f), out x);
-
             // Initialize containers
             outputTriangles.Clear();
-            m_triangles = new TriangleRegistry(inputPoints.Count);
+            m_triangles = new DelaunayTriangleSet(inputPoints.Count);
             m_triangleStack = new Stack<int>(inputPoints.Count);
 
             // 1
@@ -42,12 +40,12 @@ namespace Game.Utils.Geometry
 
             AddPointsToGrid(normalizedPoints, normalizedCloudBounds, out m_grid);
 
-            //m_grid.DrawGrid(new Color(0.0f, 0.0f, 1.0f, 0.2f), 30.0f);
+            m_grid.DrawGrid(new Color(0.0f, 0.0f, 1.0f, 0.2f), 30.0f);
 
             // 3
             Triangle2D supertriangle = new Triangle2D(new Vector2(-100.0f, -100.0f), new Vector2(100.0f, -100.0f), new Vector2(0.0f, 100.0f)); // CCW
             
-            m_triangles.AddTriangle(supertriangle.p0, supertriangle.p1, supertriangle.p2, -1, -1, -1);
+            m_triangles.AddTriangle(supertriangle.p0, supertriangle.p1, supertriangle.p2, NO_ADJACENT_TRIANGLE, NO_ADJACENT_TRIANGLE, NO_ADJACENT_TRIANGLE);
 
             // 4
 
@@ -160,14 +158,14 @@ namespace Game.Utils.Geometry
             }
         }
 
-        private int AddPointToTriangulation(Vector2 pointToInsert, TriangleRegistry triangles)
+        private int AddPointToTriangulation(Vector2 pointToInsert, DelaunayTriangleSet triangles)
         {
             // Note: Adjacent triangle, opposite to the inserted point, is always at index 1
             // Note 2: Adjacent triangles are stored CCW automatically, their index matches the index of the first vertex in every edge, and it is known that vertices are stored CCW
 
             int existingPointIndex = m_triangles.GetIndexOfPoint(pointToInsert);
 
-            if (existingPointIndex != -1)
+            if (existingPointIndex != NOT_FOUND)
             {
                 return existingPointIndex;
             }
@@ -182,7 +180,7 @@ namespace Game.Utils.Geometry
 
             // Adds 2 new triangles
             DelaunayTriangle newTriangle1 = new DelaunayTriangle(insertedPoint, containingTriangle.p[0], containingTriangle.p[1]);
-            newTriangle1.adjacent[0] = -1;
+            newTriangle1.adjacent[0] = NO_ADJACENT_TRIANGLE;
             newTriangle1.adjacent[1] = containingTriangle.adjacent[0];
             newTriangle1.adjacent[2] = containingTriangleIndex;
             int triangle1Index = m_triangles.AddTriangle(newTriangle1);
@@ -190,7 +188,7 @@ namespace Game.Utils.Geometry
             DelaunayTriangle newTriangle2 = new DelaunayTriangle(insertedPoint, containingTriangle.p[2], containingTriangle.p[0]);
             newTriangle2.adjacent[0] = containingTriangleIndex;
             newTriangle2.adjacent[1] = containingTriangle.adjacent[2];
-            newTriangle2.adjacent[2] = -1;
+            newTriangle2.adjacent[2] = NO_ADJACENT_TRIANGLE;
             int triangle2Index = m_triangles.AddTriangle(newTriangle2);
 
             // Sets adjacency between the 2 new triangles
@@ -200,12 +198,12 @@ namespace Game.Utils.Geometry
             m_triangles.SetTriangleAdjacency(triangle2Index, newTriangle2.adjacent);
 
             // Sets the adjacency of the triangles that were adjacent to the original containing triangle
-            if (newTriangle1.adjacent[1] != -1)
+            if (newTriangle1.adjacent[1] != NO_ADJACENT_TRIANGLE)
             {
                 m_triangles.ReplaceAdjacent(newTriangle1.adjacent[1], containingTriangleIndex, triangle1Index);
             }
 
-            if (newTriangle2.adjacent[1] != -1)
+            if (newTriangle2.adjacent[1] != NO_ADJACENT_TRIANGLE)
             {
                 m_triangles.ReplaceAdjacent(newTriangle2.adjacent[1], containingTriangleIndex, triangle2Index);
             }
@@ -217,17 +215,17 @@ namespace Game.Utils.Geometry
             m_triangles.ReplaceTriangle(containingTriangleIndex, containingTriangle);
 
             // Triangles that contain the inserted point are added to the stack for them to be processed by the Delaunay swapping algorithm
-            if(containingTriangle.adjacent[1] != -1)
+            if(containingTriangle.adjacent[1] != NO_ADJACENT_TRIANGLE)
             {
                 m_triangleStack.Push(containingTriangleIndex);
             }
 
-            if(newTriangle1.adjacent[1] != -1)
+            if(newTriangle1.adjacent[1] != NO_ADJACENT_TRIANGLE)
             {
                 m_triangleStack.Push(triangle1Index);
             }
 
-            if (newTriangle2.adjacent[1] != -1)
+            if (newTriangle2.adjacent[1] != NO_ADJACENT_TRIANGLE)
             {
                 m_triangleStack.Push(triangle2Index);
             }
@@ -244,17 +242,21 @@ namespace Game.Utils.Geometry
             {
                 int currentTriangleToSwap = m_triangleStack.Pop();
                 DelaunayTriangle triangle = m_triangles.GetTriangle(currentTriangleToSwap);
-                Triangle2D trianglePoints = m_triangles.GetTrianglePoints(currentTriangleToSwap);
 
-                if(triangle.adjacent[1] == -1)
+                const int OPPOSITE_TRIANGLE_INDEX = 1;
+
+                if(triangle.adjacent[OPPOSITE_TRIANGLE_INDEX] == NO_ADJACENT_TRIANGLE)
                 {
                     continue;
                 }
 
-                DelaunayTriangle oppositeTriangle = m_triangles.GetTriangle(triangle.adjacent[1]);
-                Triangle2D oppositeTrianglePoints = m_triangles.GetTrianglePoints(triangle.adjacent[1]);
+                const int NOT_IN_EDGE_VERTEX_INDEX = 0;
+                Vector2 triangleVertexNotInEdge = m_triangles.GetPointByIndex(triangle.p[NOT_IN_EDGE_VERTEX_INDEX]);
 
-                if(GeometryUtils.IsPointInsideCircumcircle(oppositeTrianglePoints.p0, oppositeTrianglePoints.p1, oppositeTrianglePoints.p2, trianglePoints.p0))
+                DelaunayTriangle oppositeTriangle = m_triangles.GetTriangle(triangle.adjacent[OPPOSITE_TRIANGLE_INDEX]);
+                Triangle2D oppositeTrianglePoints = m_triangles.GetTrianglePoints(triangle.adjacent[OPPOSITE_TRIANGLE_INDEX]);
+
+                if(MathUtils.IsPointInsideCircumcircle(oppositeTrianglePoints.p0, oppositeTrianglePoints.p1, oppositeTrianglePoints.p2, triangleVertexNotInEdge))
                 {
                     // Finds the edge of the opposite triangle that is shared with the other triangle, this edge will be swapped
                     int sharedEdgeVertex = 0;
@@ -263,36 +265,37 @@ namespace Game.Utils.Geometry
                     {
                         if (oppositeTriangle.adjacent[sharedEdgeVertex] == currentTriangleToSwap)
                         {
+                            Debug.Log("<color=cyan>" + sharedEdgeVertex + "</color>");
                             break;
                         }
                     }
 
-                    SwapEdges(currentTriangleToSwap, triangle, 0, oppositeTriangle, sharedEdgeVertex);
-
                     // Adds the 2 triangles that were adjacent to the opposite triangle, to be processed too
-                    if(oppositeTriangle.adjacent[(sharedEdgeVertex + 1) % 3] != -1)
+                    if (oppositeTriangle.adjacent[(sharedEdgeVertex + 1) % 3] != NO_ADJACENT_TRIANGLE)
                     {
                         m_triangleStack.Push(oppositeTriangle.adjacent[(sharedEdgeVertex + 1) % 3]);
                     }
 
-                    if (oppositeTriangle.adjacent[(sharedEdgeVertex + 2) % 3] != -1)
+                    if (oppositeTriangle.adjacent[(sharedEdgeVertex + 2) % 3] != NO_ADJACENT_TRIANGLE)
                     {
                         m_triangleStack.Push(oppositeTriangle.adjacent[(sharedEdgeVertex + 2) % 3]);
                     }
+
+                    SwapEdges(currentTriangleToSwap, triangle, NOT_IN_EDGE_VERTEX_INDEX, oppositeTriangle, sharedEdgeVertex);
                 }
             }
         }
 
         // sharedEdgeVertex: the index in the first triangle, 0-2
         // for the first triangle, its shared edge vertex is moved, so the new shared edge vertex is 1 position behind / or 2 forward (if it was 1, now the shared edge is 0)
-        private void SwapEdges(int triangleIndex, DelaunayTriangle triangle, int notInEdgeTriangleVertex, DelaunayTriangle oppositeTriangle, int oppositeTriangleSharedEdgeVertex)
+        private void SwapEdges(int triangleIndex, DelaunayTriangle triangle, int notInEdgeTriangleVertex, DelaunayTriangle oppositeTriangle, int oppositeTriangleSharedEdgeVertexLocalIndex)
         {
-            List<int> debugP = triangle.DebugP;
-            List<int> debugA = triangle.DebugAdjacent;
-            List<int> debugP2 = oppositeTriangle.DebugP;
-            List<int> debugA2 = oppositeTriangle.DebugAdjacent;
+            //List<int> debugP = triangle.DebugP;
+            //List<int> debugA = triangle.DebugAdjacent;
+            //List<int> debugP2 = oppositeTriangle.DebugP;
+            //List<int> debugA2 = oppositeTriangle.DebugAdjacent;
 
-            int oppositeVertex = (oppositeTriangleSharedEdgeVertex + 2) % 3;
+            int oppositeVertex = (oppositeTriangleSharedEdgeVertexLocalIndex + 2) % 3;
 
             //           2 _|_ a
             //       A2 _   |   _
@@ -317,8 +320,8 @@ namespace Game.Utils.Geometry
             // Only one vertex of each triangle is moved
             int oppositeTriangleIndex = triangle.adjacent[(notInEdgeTriangleVertex + 1) % 3];
             triangle.p[(notInEdgeTriangleVertex + 1) % 3] = oppositeTriangle.p[oppositeVertex];
-            oppositeTriangle.p[oppositeTriangleSharedEdgeVertex] = triangle.p[notInEdgeTriangleVertex];
-            oppositeTriangle.adjacent[oppositeTriangleSharedEdgeVertex] = triangle.adjacent[notInEdgeTriangleVertex];
+            oppositeTriangle.p[oppositeTriangleSharedEdgeVertexLocalIndex] = triangle.p[notInEdgeTriangleVertex];
+            oppositeTriangle.adjacent[oppositeTriangleSharedEdgeVertexLocalIndex] = triangle.adjacent[notInEdgeTriangleVertex];
             triangle.adjacent[notInEdgeTriangleVertex] = oppositeTriangleIndex;
             triangle.adjacent[(notInEdgeTriangleVertex + 1) % 3] = oppositeTriangle.adjacent[oppositeVertex];
             oppositeTriangle.adjacent[oppositeVertex] = triangleIndex;
@@ -327,14 +330,14 @@ namespace Game.Utils.Geometry
             m_triangles.ReplaceTriangle(oppositeTriangleIndex, oppositeTriangle);
 
             // Adjacent triangles are updated too
-            if (triangle.adjacent[(notInEdgeTriangleVertex + 1) % 3] != -1)
+            if (triangle.adjacent[(notInEdgeTriangleVertex + 1) % 3] != NO_ADJACENT_TRIANGLE)
             {
                 m_triangles.ReplaceAdjacent(triangle.adjacent[(notInEdgeTriangleVertex + 1) % 3], oppositeTriangleIndex, triangleIndex);
             }
 
-            if (oppositeTriangle.adjacent[oppositeTriangleSharedEdgeVertex] != -1)
+            if (oppositeTriangle.adjacent[oppositeTriangleSharedEdgeVertexLocalIndex] != NO_ADJACENT_TRIANGLE)
             {
-                m_triangles.ReplaceAdjacent(oppositeTriangle.adjacent[oppositeTriangleSharedEdgeVertex], triangleIndex, oppositeTriangleIndex);
+                m_triangles.ReplaceAdjacent(oppositeTriangle.adjacent[oppositeTriangleSharedEdgeVertexLocalIndex], triangleIndex, oppositeTriangleIndex);
             }
         }
 
@@ -342,7 +345,7 @@ namespace Game.Utils.Geometry
         {
             // 2
             // Detects if the edge already exists
-            if (m_triangles.FindTriangleThatContainsEdge(endpointAIndex, endpointBIndex).TriangleIndex != -1)
+            if (m_triangles.FindTriangleThatContainsEdge(endpointAIndex, endpointBIndex).TriangleIndex != NOT_FOUND)
             {
                 return;
             }
@@ -350,168 +353,135 @@ namespace Game.Utils.Geometry
             Vector2 edgeEndpointA = m_triangles.GetPointByIndex(endpointAIndex);
             Vector2 edgeEndpointB = m_triangles.GetPointByIndex(endpointBIndex);
 
-            List<DelaunayTriangleEdge> intersectedTriangleEdges = new List<DelaunayTriangleEdge>();
-            int triangleContainingA = m_triangles.FindTriangleThatContainsLineEndpoint(endpointAIndex, (edgeEndpointB - edgeEndpointA));
+            int triangleContainingA = m_triangles.FindTriangleThatContainsLineEndpoint(endpointAIndex, endpointBIndex);
 
             List<DelaunayTriangleEdge> newEdges = new List<DelaunayTriangleEdge>();
 
-            bool debugStop = false;
-            bool isConstrainedEdgeFinished = false;
+            List<DelaunayTriangleEdge> intersectedTriangleEdges = new List<DelaunayTriangleEdge>();
+            m_triangles.GetIntersectingEdges(edgeEndpointA, edgeEndpointB, triangleContainingA, intersectedTriangleEdges);
 
-            //while(!isConstrainedEdgeFinished)
+            // 3
+            while (intersectedTriangleEdges.Count > 0)
             {
-                isConstrainedEdgeFinished = true;
-                intersectedTriangleEdges.Clear();
+                // 3.1
+                DelaunayTriangleEdge currentIntersectedTriangleEdge = intersectedTriangleEdges[intersectedTriangleEdges.Count - 1];
+                intersectedTriangleEdges.RemoveAt(intersectedTriangleEdges.Count - 1);
 
-                if (triangleContainingA != -1)
+                // 3.2
+                currentIntersectedTriangleEdge = m_triangles.FindTriangleThatContainsEdge(currentIntersectedTriangleEdge.EdgeVertexA, currentIntersectedTriangleEdge.EdgeVertexB);
+                DelaunayTriangle intersectedTriangle = m_triangles.GetTriangle(currentIntersectedTriangleEdge.TriangleIndex);
+                DelaunayTriangle oppositeTriangle = m_triangles.GetTriangle(intersectedTriangle.adjacent[currentIntersectedTriangleEdge.EdgeIndex]);
+                Triangle2D trianglePoints = m_triangles.GetTrianglePoints(currentIntersectedTriangleEdge.TriangleIndex);
+
+                // Gets the opposite vertex of adjacent triangle, knowing the fisrt vertex of the shared edge
+                int oppositeVertex = NOT_FOUND;
+
+                //List<int> debugP = intersectedTriangle.DebugP;
+                //List<int> debugA = intersectedTriangle.DebugAdjacent;
+                //List<int> debugP2 = oppositeTriangle.DebugP;
+                //List<int> debugA2 = oppositeTriangle.DebugAdjacent;
+
+                int oppositeSharedEdgeVertex = NOT_FOUND; // The first vertex in the shared edge of the opposite triangle
+
+                for (int j = 0; j < 3; ++j)
                 {
-//                    m_triangles.GetIntersectingTriangles(edgeEndpointA, edgeEndpointB, triangleContainingA, intersectedTriangleEdges);
-                    m_triangles.GetIntersectingEdges(edgeEndpointA, edgeEndpointB, triangleContainingA, intersectedTriangleEdges);
-                }
-                /*else
-                {
-                    m_triangles.GetIntersectingTriangles(edgeEndpointA, edgeEndpointB, intersectedTriangleEdges);
-                }*/
-
-                // 3
-                while (intersectedTriangleEdges.Count > 0 && !debugStop)
-                {
-                    // 3.1
-                    DelaunayTriangleEdge currentIntersectedTriangleEdge = intersectedTriangleEdges[intersectedTriangleEdges.Count - 1];
-                    intersectedTriangleEdges.RemoveAt(intersectedTriangleEdges.Count - 1);
-
-                    // 3.2
-                    currentIntersectedTriangleEdge = m_triangles.FindTriangleThatContainsEdge(currentIntersectedTriangleEdge.EdgeVertexA, currentIntersectedTriangleEdge.EdgeVertexB);
-                    DelaunayTriangle intersectedTriangle = m_triangles.GetTriangle(currentIntersectedTriangleEdge.TriangleIndex);
-                    DelaunayTriangle oppositeTriangle = m_triangles.GetTriangle(intersectedTriangle.adjacent[currentIntersectedTriangleEdge.EdgeIndex]);
-                    Triangle2D trianglePoints = m_triangles.GetTrianglePoints(currentIntersectedTriangleEdge.TriangleIndex);
-
-                    // Gets the opposite vertex of adjacent triangle, knowing the fisrt vertex of the shared edge
-                    int oppositeVertex = -1;
-
-                    List<int> debugP = intersectedTriangle.DebugP;
-                    List<int> debugA = intersectedTriangle.DebugAdjacent;
-                    List<int> debugP2 = oppositeTriangle.DebugP;
-                    List<int> debugA2 = oppositeTriangle.DebugAdjacent;
-
-                    int oppositeSharedEdgeVertex = -1; // The first vertex in the shared edge of the opposite triangle
-
-                    for (int j = 0; j < 3; ++j)
+                    if (oppositeTriangle.p[j] == intersectedTriangle.p[currentIntersectedTriangleEdge.EdgeIndex])
                     {
-                        if (oppositeTriangle.p[j] == intersectedTriangle.p[currentIntersectedTriangleEdge.EdgeIndex])
-                        {
-                            oppositeVertex = oppositeTriangle.p[(j + 1) % 3];
-                            oppositeSharedEdgeVertex = (j + 2) % 3;
-                            break;
-                        }
+                        oppositeVertex = oppositeTriangle.p[(j + 1) % 3];
+                        oppositeSharedEdgeVertex = (j + 2) % 3;
+                        break;
                     }
+                }
 
-                    Vector2 oppositePoint = m_triangles.GetPointByIndex(oppositeVertex);
+                Vector2 oppositePoint = m_triangles.GetPointByIndex(oppositeVertex);
 
-                    if (GeometryUtils.IsQuadrilateralConvex(trianglePoints.p0, trianglePoints.p1, trianglePoints.p2, oppositePoint))
+                if (MathUtils.IsQuadrilateralConvex(trianglePoints.p0, trianglePoints.p1, trianglePoints.p2, oppositePoint))
+                {
+                    // Swap
+                    int notInEdgeTriangleVertex = (currentIntersectedTriangleEdge.EdgeIndex + 2) % 3;
+                    SwapEdges(currentIntersectedTriangleEdge.TriangleIndex, intersectedTriangle, notInEdgeTriangleVertex, oppositeTriangle, oppositeSharedEdgeVertex);
+
+                    // Refreshes triangle data after swapping
+                    intersectedTriangle = m_triangles.GetTriangle(currentIntersectedTriangleEdge.TriangleIndex);
+
+                    //oppositeTriangle = m_triangles.GetTriangle(intersectedTriangle.adjacent[(currentIntersectedTriangleEdge.EdgeIndex + 2) % 3]);
+                    //debugP = intersectedTriangle.DebugP;
+                    //debugA = intersectedTriangle.DebugAdjacent;
+                    //debugP2 = oppositeTriangle.DebugP;
+                    //debugA2 = oppositeTriangle.DebugAdjacent;
+
+                    // Check new diagonal against the intersecting edge
+                    Vector2 intersectionPoint;
+                    int newTriangleSharedEdgeVertex = (currentIntersectedTriangleEdge.EdgeIndex + 2) % 3; // Read SwapEdges method to understand the +2
+                    Vector2 newTriangleSharedEdgePointA = m_triangles.GetPointByIndex(intersectedTriangle.p[newTriangleSharedEdgeVertex]);
+                    Vector2 newTriangleSharedEdgePointB = m_triangles.GetPointByIndex(intersectedTriangle.p[(newTriangleSharedEdgeVertex  + 1) % 3]);
+
+                    DelaunayTriangleEdge newEdge = new DelaunayTriangleEdge(NOT_FOUND, NOT_FOUND, intersectedTriangle.p[newTriangleSharedEdgeVertex], intersectedTriangle.p[(newTriangleSharedEdgeVertex + 1) % 3]);
+
+                    if (newTriangleSharedEdgePointA != edgeEndpointB && newTriangleSharedEdgePointB != edgeEndpointB && // Watch out! It thinks the line intersects with the edge when an endpoint coincides with a triangle vertex, this problem is avoided thanks to this conditions
+                        newTriangleSharedEdgePointA != edgeEndpointA && newTriangleSharedEdgePointB != edgeEndpointA &&
+                        MathUtils.InsersectionBetweenLines(edgeEndpointA, edgeEndpointB, newTriangleSharedEdgePointA, newTriangleSharedEdgePointB, out intersectionPoint))
                     {
-                        // Swap
-                        int notInEdgeTriangleVertex = (currentIntersectedTriangleEdge.EdgeIndex + 2) % 3;
-                        SwapEdges(currentIntersectedTriangleEdge.TriangleIndex, intersectedTriangle, notInEdgeTriangleVertex, oppositeTriangle, oppositeSharedEdgeVertex);
-
-                        // Refreshes triangle data after swapping
-                        intersectedTriangle = m_triangles.GetTriangle(currentIntersectedTriangleEdge.TriangleIndex);
-                        oppositeTriangle = m_triangles.GetTriangle(intersectedTriangle.adjacent[(currentIntersectedTriangleEdge.EdgeIndex + 2) % 3]);
-
-                        debugP = intersectedTriangle.DebugP;
-                        debugA = intersectedTriangle.DebugAdjacent;
-                        debugP2 = oppositeTriangle.DebugP;
-                        debugA2 = oppositeTriangle.DebugAdjacent;
-
-                        // Check new diagonal against the intersecting edge
-                        Vector2 intersectionPoint;
-                        int newTriangleSharedEdgeVertex = (currentIntersectedTriangleEdge.EdgeIndex + 2) % 3; // Read SwapEdges method to understand the +2
-                        Vector2 newTriangleSharedEdgePointA = m_triangles.GetPointByIndex(intersectedTriangle.p[newTriangleSharedEdgeVertex]);
-                        Vector2 newTriangleSharedEdgePointB = m_triangles.GetPointByIndex(intersectedTriangle.p[(newTriangleSharedEdgeVertex  + 1) % 3]);
-
-                        DelaunayTriangleEdge newEdge = new DelaunayTriangleEdge(currentIntersectedTriangleEdge.TriangleIndex, newTriangleSharedEdgeVertex, intersectedTriangle.p[newTriangleSharedEdgeVertex], intersectedTriangle.p[(newTriangleSharedEdgeVertex + 1) % 3]);
-
-                        if (newTriangleSharedEdgePointA != edgeEndpointB && newTriangleSharedEdgePointB != edgeEndpointB && // Watch out! It thinks the line intersects with the edge when an endpoint coincides with a triangle vertex
-                            newTriangleSharedEdgePointA != edgeEndpointA && newTriangleSharedEdgePointB != edgeEndpointA &&
-                            GeometryUtils.InsersectionBetweenLines(edgeEndpointA, edgeEndpointB, newTriangleSharedEdgePointA, newTriangleSharedEdgePointB, out intersectionPoint))
-                        {
-                            // New triangles edge still intersects with the constrained edge, so it is returned to the list
-                            intersectedTriangleEdges.Insert(0, newEdge);
-                            isConstrainedEdgeFinished = false;
-                        }
-                        else
-                        {
-                            newEdges.Add(newEdge);
-                        }
+                        // New triangles edge still intersects with the constrained edge, so it is returned to the list
+                        intersectedTriangleEdges.Insert(0, newEdge);
                     }
                     else
                     {
-                        // Back to the list
-                        intersectedTriangleEdges.Insert(0, currentIntersectedTriangleEdge);
-                        isConstrainedEdgeFinished = false;
+                        newEdges.Add(newEdge);
                     }
+                }
+                else
+                {
+                    // Back to the list
+                    intersectedTriangleEdges.Insert(0, currentIntersectedTriangleEdge);
                 }
             }
 
             // 4
-//return;
+            // For the new triangles, we check they all fulfill the Delaunay constraint
+
             // 4.1
-            if(newEdges.Count > 0)
+            for(int i = 0; i < newEdges.Count; ++i)
             {
-                int i = -1;
+                // 4.2
+                // Checks if the constrained edge coincides with the new edge
+                Vector2 triangleEdgePointA = m_triangles.GetPointByIndex(newEdges[i].EdgeVertexA);
+                Vector2 triangleEdgePointB = m_triangles.GetPointByIndex(newEdges[i].EdgeVertexB);
 
-                do
+                if ((triangleEdgePointA == edgeEndpointA && triangleEdgePointB == edgeEndpointB) ||
+                    (triangleEdgePointB == edgeEndpointA && triangleEdgePointA == edgeEndpointB))
                 {
-                    ++i;
+                    continue;
+                }
 
-                    // 4.2
-                    // Checks if the constrained edge coincides with the new edge
-                    DelaunayTriangleEdge currentEdge = m_triangles.FindTriangleThatContainsEdge(newEdges[i].EdgeVertexA, newEdges[i].EdgeVertexB);
-                    DelaunayTriangle currentEdgeTriangle = m_triangles.GetTriangle(currentEdge.TriangleIndex);
-//                    DelaunayTriangle currentEdgeTriangle = m_triangles.GetTriangle(newEdges[i].TriangleIndex);
-                    Vector2 triangleEdgePointA = m_triangles.GetPointByIndex(currentEdgeTriangle.p[currentEdge.EdgeIndex]);
-                    Vector2 triangleEdgePointB = m_triangles.GetPointByIndex(currentEdgeTriangle.p[(currentEdge.EdgeIndex + 1) % 3]);
+                // 4.3
+                DelaunayTriangleEdge currentEdge = m_triangles.FindTriangleThatContainsEdge(newEdges[i].EdgeVertexA, newEdges[i].EdgeVertexB);
+                DelaunayTriangle currentEdgeTriangle = m_triangles.GetTriangle(currentEdge.TriangleIndex);
+                int triangleVertexNotShared = (currentEdge.EdgeIndex + 2) % 3;
+                Vector2 trianglePointNotShared = m_triangles.GetPointByIndex(currentEdgeTriangle.p[triangleVertexNotShared]);
+                DelaunayTriangle oppositeTriangle = m_triangles.GetTriangle(currentEdgeTriangle.adjacent[currentEdge.EdgeIndex]);
+                Triangle2D oppositeTrianglePoints = m_triangles.GetTrianglePoints(currentEdgeTriangle.adjacent[currentEdge.EdgeIndex]);
 
-                    if ((triangleEdgePointA == edgeEndpointA && triangleEdgePointB == edgeEndpointB) ||
-                        (triangleEdgePointB == edgeEndpointA && triangleEdgePointA == edgeEndpointB))
+                //List<int> debugP = currentEdgeTriangle.DebugP;
+                //List<int> debugA = currentEdgeTriangle.DebugAdjacent;
+                //List<int> debugP2 = oppositeTriangle.DebugP;
+                //List<int> debugA2 = oppositeTriangle.DebugAdjacent;
+
+                if (MathUtils.IsPointInsideCircumcircle(oppositeTrianglePoints.p0, oppositeTrianglePoints.p1, oppositeTrianglePoints.p2, trianglePointNotShared))
+                {
+                    // Finds the edge of the opposite triangle that is shared with the other triangle, this edge will be swapped
+                    int sharedEdgeVertexLocalIndex = 0;
+
+                    for (; sharedEdgeVertexLocalIndex < 3; ++sharedEdgeVertexLocalIndex)
                     {
-                        continue;
-                    }
-
-                    // 4.3
-                    if (currentEdgeTriangle.adjacent[1] == -1)
-                    {
-                        // TODO: Should add a new point that splits the triangle in 2?
-                        continue;
-                    }
-
-                    int triangleVertexNotShared = (currentEdge.EdgeIndex + 2) % 3;
-                    Vector2 trianglePointNotShared = m_triangles.GetPointByIndex(currentEdgeTriangle.p[triangleVertexNotShared]);
-                    DelaunayTriangle oppositeTriangle = m_triangles.GetTriangle(currentEdgeTriangle.adjacent[currentEdge.EdgeIndex]);
-                    Triangle2D oppositeTrianglePoints = m_triangles.GetTrianglePoints(currentEdgeTriangle.adjacent[currentEdge.EdgeIndex]);
-
-                    List<int> debugP = currentEdgeTriangle.DebugP;
-                    List<int> debugA = currentEdgeTriangle.DebugAdjacent;
-                    List<int> debugP2 = oppositeTriangle.DebugP;
-                    List<int> debugA2 = oppositeTriangle.DebugAdjacent;
-
-                    if (GeometryUtils.IsPointInsideCircumcircle(oppositeTrianglePoints.p0, oppositeTrianglePoints.p1, oppositeTrianglePoints.p2, trianglePointNotShared))
-                    {
-                        // Finds the edge of the opposite triangle that is shared with the other triangle, this edge will be swapped
-                        int sharedEdgeVertex = 0;
-
-                        for (; sharedEdgeVertex < 3; ++sharedEdgeVertex)
+                        if (oppositeTriangle.adjacent[sharedEdgeVertexLocalIndex] == currentEdge.TriangleIndex)
                         {
-                            if (oppositeTriangle.adjacent[sharedEdgeVertex] == currentEdge.TriangleIndex)
-                            {
-                                break;
-                            }
+                            break;
                         }
-
-                        SwapEdges(currentEdge.TriangleIndex, currentEdgeTriangle, triangleVertexNotShared, oppositeTriangle, sharedEdgeVertex);
                     }
 
-                } while (i < newEdges.Count - 1);
+                    SwapEdges(currentEdge.TriangleIndex, currentEdgeTriangle, triangleVertexNotShared, oppositeTriangle, sharedEdgeVertexLocalIndex);
+                }
             }
 
             Debug.DrawLine(edgeEndpointA, edgeEndpointB, Color.magenta, 10.0f);
@@ -572,7 +542,7 @@ namespace Game.Utils.Geometry
 
         private void AddPointsToGrid(List<Vector2> inputPoints, Bounds gridBounds, out PointBinGrid outputGrid)
         {
-            outputGrid = new PointBinGrid(Mathf.FloorToInt(Mathf.Sqrt(inputPoints.Count) * 0.5f + 1.0f), gridBounds.size);
+            outputGrid = new PointBinGrid(Mathf.CeilToInt(Mathf.Sqrt(Mathf.Sqrt(inputPoints.Count))), gridBounds.size);
 
             for (int i = 0; i < inputPoints.Count; ++i)
             {
@@ -587,32 +557,6 @@ namespace Game.Utils.Geometry
                 Debug.DrawRay(points[i], Vector2.up * 0.2f, Color.red, duration);
                 Debug.DrawRay(points[i], Vector2.right * 0.2f, Color.green, duration);
             }
-        }
-
-        private bool IsEdgeInTheTriangulation(Vector2 edgeEndpointA, Vector2 edgeEndpointB)
-        {
-            List<int> trianglesWithVertex = new List<int>();
-            int pointOfTriangleA = m_triangles.GetIndexOfPoint(edgeEndpointA);
-            int pointOfTriangleB = m_triangles.GetIndexOfPoint(edgeEndpointB);
-            m_triangles.GetTrianglesWithVertex(pointOfTriangleA, trianglesWithVertex);
-
-            for (int i = 0; i < trianglesWithVertex.Count; ++i)
-            {
-                DelaunayTriangle currentTriangle = m_triangles.GetTriangle(trianglesWithVertex[i]);
-                int indexOfTrianglePoint = 0;
-
-                for(; indexOfTrianglePoint < 3; ++indexOfTrianglePoint)
-                {
-                    if (currentTriangle.p[indexOfTrianglePoint] == pointOfTriangleA &&
-                        (currentTriangle.p[(indexOfTrianglePoint + 1) % 3] == pointOfTriangleB ||
-                         currentTriangle.p[(indexOfTrianglePoint + 2) % 3] == pointOfTriangleB))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
         }
     }
 }

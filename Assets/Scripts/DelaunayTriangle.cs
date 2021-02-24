@@ -1,15 +1,13 @@
-
-using Game.Utils.Algebra;
-using System;
 using System.Collections.Generic;
-using UnityEngine;
 
-namespace Game.Utils.Geometry
+namespace Game.Utils.Math
 {
     public unsafe struct DelaunayTriangle
     {
         public fixed int p[3];
         public fixed int adjacent[3];
+
+        private const int NO_ADJACENT_TRIANGLE = -1;
 
         public DelaunayTriangle(int point0, int point1, int point2)
         {
@@ -17,9 +15,9 @@ namespace Game.Utils.Geometry
             p[1] = point1;
             p[2] = point2;
 
-            adjacent[0] = -1;
-            adjacent[1] = -1;
-            adjacent[2] = -1;
+            adjacent[0] = NO_ADJACENT_TRIANGLE;
+            adjacent[1] = NO_ADJACENT_TRIANGLE;
+            adjacent[2] = NO_ADJACENT_TRIANGLE;
         }
 
         public DelaunayTriangle(int point0, int point1, int point2, int adjacent0, int adjacent1, int adjacent2)

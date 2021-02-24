@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Game.Utils.Geometry
+namespace Game.Utils.Math
 {
     public class PointBinGrid
     {
