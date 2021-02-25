@@ -164,7 +164,6 @@ namespace Game.Utils.Math
 
                 for (int i = 0; i < 3; ++i)
                 {
-                    Debug.Log(currentTriangle);
                     int adjacentTriangle = m_adjacentTriangles[currentTriangle * 3 + i];
 
                     if (adjacentTriangle != NO_ADJACENT_TRIANGLE && !outputTrianglesInPolygon.Contains(adjacentTriangle))

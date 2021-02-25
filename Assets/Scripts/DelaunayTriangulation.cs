@@ -126,24 +126,27 @@ namespace Game.Utils.Math
 
             for(int i = 0; i < m_triangles.TriangleCount; ++i)
             {
-                int j = 0;
+                bool isTriangleToBeRemoved = false;
 
-                for (; j < trianglesToRemove.Count; ++j)
+                // Is the triangle in the "To Remove" list?
+                for (int j = 0; j < trianglesToRemove.Count; ++j)
                 {
                     if(trianglesToRemove[j] == i)
                     {
+                        trianglesToRemove.RemoveAt(j);
+                        isTriangleToBeRemoved = true;
                         break;
                     }
                 }
 
-                if(j == trianglesToRemove.Count) // The triangle is not in the "To Remove" list
+                if(!isTriangleToBeRemoved)
                 {
                     DelaunayTriangle triangle = m_triangles.GetTriangle(i);
                     outputTriangles.Add(new Triangle2D(denormalizedPoints[triangle.p[0]], denormalizedPoints[triangle.p[1]], denormalizedPoints[triangle.p[2]]));
                 }
             }
             
-            m_triangles.LogDump();
+            //m_triangles.LogDump();
         }
 
         private void GetSupertriangleTriangles(List<int> outputTriangles)
