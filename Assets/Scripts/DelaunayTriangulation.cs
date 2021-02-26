@@ -40,7 +40,7 @@ namespace Game.Utils.Math
 
             AddPointsToGrid(normalizedPoints, normalizedCloudBounds, out m_grid);
 
-            m_grid.DrawGrid(new Color(0.0f, 0.0f, 1.0f, 0.2f), 30.0f);
+            m_grid.DrawGrid(new Color(0.0f, 0.0f, 1.0f, 0.2f), 10.0f);
 
             // 3
             Triangle2D supertriangle = new Triangle2D(new Vector2(-100.0f, -100.0f), new Vector2(100.0f, -100.0f), new Vector2(0.0f, 100.0f)); // CCW
@@ -388,10 +388,10 @@ namespace Game.Utils.Math
 
                 for (int j = 0; j < 3; ++j)
                 {
-                    if (oppositeTriangle.p[j] == intersectedTriangle.p[currentIntersectedTriangleEdge.EdgeIndex])
+                    if (oppositeTriangle.p[j] == intersectedTriangle.p[(currentIntersectedTriangleEdge.EdgeIndex + 1) % 3]) // Comparing with the endpoint B of the edge, since the edge AB is BA in the adjacent triangle
                     {
-                        oppositeVertex = oppositeTriangle.p[(j + 1) % 3];
-                        oppositeSharedEdgeVertex = (j + 2) % 3;
+                        oppositeVertex = oppositeTriangle.p[(j + 2) % 3];
+                        oppositeSharedEdgeVertex = j;
                         break;
                     }
                 }

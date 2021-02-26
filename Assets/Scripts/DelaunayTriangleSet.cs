@@ -124,19 +124,26 @@ namespace Game.Utils.Math
 
                 outputTrianglesInPolygon.Add(triangleEdge.TriangleIndex);
 
-                for(int j = 1; j < 3; ++j) // For the 2 adjacent triangles of the other 2 edges
+                int previousOutlineEdgeVertexA = polygonOutline[(i + polygonOutline.Count - 1) % polygonOutline.Count];
+                int previousOutlineEdgeVertexB = polygonOutline[i];
+                int nextOutlineEdgeVertexA = polygonOutline[(i + 1) % polygonOutline.Count];
+                int nextOutlineEdgeVertexB = polygonOutline[(i + 2) % polygonOutline.Count];
+
+                for (int j = 1; j < 3; ++j) // For the 2 adjacent triangles of the other 2 edges
                 {
                     int adjacentTriangle = m_adjacentTriangles[triangleEdge.TriangleIndex * 3 + (triangleEdge.EdgeIndex + j) % 3];
                     bool isAdjacentTriangleInOutline = false;
 
+                    // Compares the contiguous edges of the outline, to the right and to the left of the current one, flipped and not flipped, with the adjacent triangle's edges
                     for (int k = 0; k < 3; ++k)
                     {
-                        // Compares the contiguous edges, to the right and to the left, (flipped) with the adjacent triangle's edges
-                        if ((m_triangleVertices[adjacentTriangle * 3 + (k + 1) % 3] == polygonOutline[(i + 1) % polygonOutline.Count] &&
-                             m_triangleVertices[adjacentTriangle * 3 + k] == polygonOutline[(i + 2) % polygonOutline.Count])
-                            ||
-                            (m_triangleVertices[adjacentTriangle * 3 + (k + 1) % 3] == polygonOutline[(i + polygonOutline.Count - 1) % polygonOutline.Count] &&
-                             m_triangleVertices[adjacentTriangle * 3 + k] == polygonOutline[(i + polygonOutline.Count) % polygonOutline.Count]))
+                        int currentTriangleEdgeVertexA = m_triangleVertices[adjacentTriangle * 3 + k];
+                        int currentTriangleEdgeVertexB = m_triangleVertices[adjacentTriangle * 3 + (k + 1) % 3];
+
+                        if ((currentTriangleEdgeVertexA == previousOutlineEdgeVertexA && currentTriangleEdgeVertexB == previousOutlineEdgeVertexB) ||
+                            (currentTriangleEdgeVertexA == previousOutlineEdgeVertexB && currentTriangleEdgeVertexB == previousOutlineEdgeVertexA) ||
+                            (currentTriangleEdgeVertexA == nextOutlineEdgeVertexA && currentTriangleEdgeVertexB == nextOutlineEdgeVertexB) ||
+                            (currentTriangleEdgeVertexA == nextOutlineEdgeVertexB && currentTriangleEdgeVertexB == nextOutlineEdgeVertexA))
                         {
                             isAdjacentTriangleInOutline = true;
                         }
