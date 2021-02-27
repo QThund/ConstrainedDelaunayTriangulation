@@ -1,17 +1,51 @@
+// Copyright 2021 Alejandro Villalba Avila
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), 
+// to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+// and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS 
+// IN THE SOFTWARE.
+
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace Game.Utils.Math
 {
+    /// <summary>
+    /// Stores data related to triangles, their vertices and their adjacency and provides methods to gather and process that data.
+    /// </summary>
     public unsafe class DelaunayTriangleSet
     {
+        /// <summary>
+        /// The indices of the adjacent triangles of every triangle, so there are 3 indices per triangle, and each index is the position of the triangle in groups of 3.
+        /// </summary>
         protected List<int> m_adjacentTriangles;
+
+        /// <summary>
+        /// The indices of the vertices of every triangle, so there are 3 indices per triangle, and each index is the position of the point in the points array.
+        /// </summary>
         protected List<int> m_triangleVertices;
+
+        /// <summary>
+        /// The real points.
+        /// </summary>
         protected List<Vector2> m_points;
 
-        private const int NOT_FOUND = -1;
-        private const int NO_ADJACENT_TRIANGLE = -1;
+        // Indicates that the index of a vertex, edge or triangle is not defined or was not found
+        protected const int NOT_FOUND = -1;
 
+        // Indicates that there is no adjacent triangle
+        protected const int NO_ADJACENT_TRIANGLE = -1;
+
+        /// <summary>
+        /// Constructor that receives the expected number of triangles to store. It will reserve memory accordingly.
+        /// </summary>
+        /// <param name="expectedTriangles">The expected number of triangles to store.</param>
         public DelaunayTriangleSet(int expectedTriangles)
         {
             m_adjacentTriangles = new List<int>(expectedTriangles * 3);
@@ -19,6 +53,30 @@ namespace Game.Utils.Math
             m_points = new List<Vector2>(expectedTriangles);
         }
 
+        /// <summary>
+        /// Removes all the data stored in the buffers, while keeping the memory.
+        /// </summary>
+        public void Clear()
+        {
+            m_adjacentTriangles.Clear();
+            m_triangleVertices.Clear();
+            m_points.Clear();;
+        }
+
+        /// <summary>
+        /// Modifies the capacity of the buffer, reserving new memory if necessary, according to the new expected number of triangles.
+        /// </summary>
+        /// <param name="expectedTriangles">The expected number of triangles to store.</param>
+        public void SetCapacity(int expectedTriangles)
+        {
+            m_adjacentTriangles.Capacity = expectedTriangles * 3;
+            m_triangleVertices.Capacity = expectedTriangles * 3;
+            m_points.Capacity = expectedTriangles;
+        }
+
+        /// <summary>
+        /// Gets the amount of points stored.
+        /// </summary>
         public List<Vector2> Points
         {
             get
@@ -27,6 +85,9 @@ namespace Game.Utils.Math
             }
         }
 
+        /// <summary>
+        ///  Gets the amount triangles store.
+        /// </summary>
         public int TriangleCount
         {
             get
@@ -35,29 +96,44 @@ namespace Game.Utils.Math
             }
         }
 
+        /// <summary>
+        /// Forms a new triangle using the existing points.
+        /// </summary>
+        /// <param name="newTriangle">All the data that describe triangle.</param>
+        /// <returns>The index of the new triangle.</returns>
         public int AddTriangle(DelaunayTriangle newTriangle)
         {
-            return AddTriangle(newTriangle.p[0], newTriangle.p[1], newTriangle.p[2], newTriangle.adjacent[0], newTriangle.adjacent[1], newTriangle.adjacent[2]);
+            m_adjacentTriangles.Add(newTriangle.adjacent[0]);
+            m_adjacentTriangles.Add(newTriangle.adjacent[1]);
+            m_adjacentTriangles.Add(newTriangle.adjacent[2]);
+            m_triangleVertices.Add(newTriangle.p[0]);
+            m_triangleVertices.Add(newTriangle.p[1]);
+            m_triangleVertices.Add(newTriangle.p[2]);
+
+            return TriangleCount - 1;
         }
 
+        /// <summary>
+        /// Adds a new point to the triangle set. This does neither form triangles nor edges.
+        /// </summary>
+        /// <param name="point">The new point.</param>
+        /// <returns>The index of the point.</returns>
         public int AddPoint(Vector2 point)
         {
             m_points.Add(point);
             return m_points.Count - 1;
         }
 
-        public int AddTriangle(int p0, int p1, int p2, int adjacentTriangle0, int adjacentTriangle1, int adjacentTriangle2)
-        {
-            m_adjacentTriangles.Add(adjacentTriangle0);
-            m_adjacentTriangles.Add(adjacentTriangle1);
-            m_adjacentTriangles.Add(adjacentTriangle2);
-            m_triangleVertices.Add(p0);
-            m_triangleVertices.Add(p1);
-            m_triangleVertices.Add(p2);
-
-            return TriangleCount - 1;
-        }
-
+        /// <summary>
+        /// Forms a new triangle using new points.
+        /// </summary>
+        /// <param name="p0">The point for the first vertex.</param>
+        /// <param name="p1">The point for the second vertex.</param>
+        /// <param name="p2">The point for the third vertex.</param>
+        /// <param name="adjacentTriangle0">The index of the first adjacent triangle.</param>
+        /// <param name="adjacentTriangle1">The index of the second adjacent triangle.</param>
+        /// <param name="adjacentTriangle2">The index of the third adjacent triangle.</param>
+        /// <returns>The index of the new triangle.</returns>
         public int AddTriangle(Vector2 p0, Vector2 p1, Vector2 p2, int adjacentTriangle0, int adjacentTriangle1, int adjacentTriangle2)
         {
             m_adjacentTriangles.Add(adjacentTriangle0);
@@ -70,6 +146,11 @@ namespace Game.Utils.Math
             return TriangleCount - 1;
         }
 
+        /// <summary>
+        /// Given the index of a point, it obtains all the existing triangles that share that point.
+        /// </summary>
+        /// <param name="vertexIndex">The index of the point that is a vertex of the triangles.</param>
+        /// <param name="outputTriangles">The indices of the triangles that have that point as one of their vertices. No elements will be removed from the list.</param>
         public void GetTrianglesWithVertex(int vertexIndex, List<int> outputTriangles)
         {
             for(int i = 0; i < TriangleCount; ++i)
@@ -85,6 +166,11 @@ namespace Game.Utils.Math
             }
         }
 
+        /// <summary>
+        /// Gets the points of a triangle.
+        /// </summary>
+        /// <param name="triangleIndex">The index of the triangle.</param>
+        /// <returns>The triangle.</returns>
         public Triangle2D GetTrianglePoints(int triangleIndex)
         {
             return new Triangle2D(m_points[m_triangleVertices[triangleIndex * 3]],
@@ -92,6 +178,11 @@ namespace Game.Utils.Math
                                   m_points[m_triangleVertices[triangleIndex * 3 + 2]]);
         }
 
+        /// <summary>
+        /// Gets the data of a triangle.
+        /// </summary>
+        /// <param name="triangleIndex">The index of the triangle.</param>
+        /// <returns>The triangle data.</returns>
         public DelaunayTriangle GetTriangle(int triangleIndex)
         {
             return new DelaunayTriangle(m_triangleVertices[triangleIndex * 3],
@@ -102,10 +193,16 @@ namespace Game.Utils.Math
                                         m_adjacentTriangles[triangleIndex * 3 + 2]);
         }
 
-        // This method assumes that the edges of the triangles to find were created using the same vertex order
-        // It also assumes all triangles are inside a supertriangle, so no adjacent triangles are -1
+        /// <summary>
+        /// Given the outline of a closed polygon, expressed as a list of vertices, it finds all the triangles that lay inside of the figure.
+        /// </summary>
+        /// <param name="polygonOutline">The outline, a list of vertex indices sorted counter-clockwise.</param>
+        /// <param name="outputTrianglesInPolygon">The list where the triangles found inside the polygon will be added. No elements are removed from this list.</param>
         public void GetTrianglesInPolygon(List<int> polygonOutline, List<int> outputTrianglesInPolygon)
         {
+            // This method assumes that the edges of the triangles to find were created using the same vertex order
+            // It also assumes all triangles are inside a supertriangle, so no adjacent triangles are -1
+
             Stack<int> adjacentTriangles = new Stack<int>();
 
             // First it gets all the triangles of the outline
@@ -114,10 +211,10 @@ namespace Game.Utils.Math
                 // For every edge, it gets the inner triangle that contains such edge
                 DelaunayTriangleEdge triangleEdge = FindTriangleThatContainsEdge(polygonOutline[i], polygonOutline[(i + 1) % polygonOutline.Count]);
 
-                // A triangle may form a corner, with 2 outline edges, this avoids adding it twice
+                // A triangle may form a corner, with 2 consecutive outline edges. This avoids adding it twice
                 if(outputTrianglesInPolygon.Count > 0 &&
-                   (outputTrianglesInPolygon[outputTrianglesInPolygon.Count - 1] == triangleEdge.TriangleIndex || // The last added triangle is the same as current?
-                    outputTrianglesInPolygon[0] == triangleEdge.EdgeIndex)) // The first added triangle is the same as the current, which the last to be added (closes the polygon)?
+                   (outputTrianglesInPolygon[outputTrianglesInPolygon.Count - 1] == triangleEdge.TriangleIndex || // Is the last added triangle the same as current?
+                    outputTrianglesInPolygon[0] == triangleEdge.TriangleIndex)) // Is the first added triangle the same as the current, which is the last to be added (closes the polygon)?
                 {
                     continue;
                 }
@@ -183,7 +280,14 @@ namespace Game.Utils.Math
             }
         }
 
-        public void GetIntersectingEdges(Vector2 edgeEndpointA, Vector2 edgeEndpointB, int startTriangle, List<DelaunayTriangleEdge> intersectingEdges)
+        /// <summary>
+        /// Calculates which edges of the triangulation intersect with a proposed line segment AB.
+        /// </summary>
+        /// <param name="lineEndpointA">The first point of the line segment.</param>
+        /// <param name="lineEndpointB">The second point of the line segment.</param>
+        /// <param name="startTriangle">The index of the triangle from which to start searching for intersections.</param>
+        /// <param name="intersectingEdges">The list where the intersected triangle edges will be added. No elements will be removed from this list.</param>
+        public void GetIntersectingEdges(Vector2 lineEndpointA, Vector2 lineEndpointB, int startTriangle, List<DelaunayTriangleEdge> intersectingEdges)
         {
             bool isTriangleContainingBFound = false;
             int triangleIndex = startTriangle;
@@ -197,14 +301,14 @@ namespace Game.Utils.Math
 
                 for (int i = 0; i < 3; ++i)
                 {
-                    if (m_points[m_triangleVertices[triangleIndex * 3 + i]] == edgeEndpointB ||
-                       m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]] == edgeEndpointB)
+                    if (m_points[m_triangleVertices[triangleIndex * 3 + i]] == lineEndpointB ||
+                       m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]] == lineEndpointB)
                     {
                         isTriangleContainingBFound = true;
                         break;
                     }
 
-                    if (MathUtils.IsPointToTheRightOfEdge(m_points[m_triangleVertices[triangleIndex * 3 + i]], m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]], edgeEndpointB))
+                    if (MathUtils.IsPointToTheRightOfEdge(m_points[m_triangleVertices[triangleIndex * 3 + i]], m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]], lineEndpointB))
                     {
                         tentativeAdjacentTriangle = i;
 
@@ -214,8 +318,8 @@ namespace Game.Utils.Math
 
                         if (MathUtils.InsersectionBetweenLines(m_points[m_triangleVertices[triangleIndex * 3 + i]],
                                                                    m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]],
-                                                                   edgeEndpointA,
-                                                                   edgeEndpointB,
+                                                                   lineEndpointA,
+                                                                   lineEndpointB,
                                                                    out intersectionPoint))
                         {
                             hasCrossedEdge = true;
@@ -244,11 +348,21 @@ namespace Game.Utils.Math
             }
         }
 
+        /// <summary>
+        /// Gets a point by its index.
+        /// </summary>
+        /// <param name="pointIndex">The index of the point.</param>
+        /// <returns>The point that corresponds to the index.</returns>
         public Vector2 GetPointByIndex(int pointIndex)
         {
             return m_points[pointIndex];
         }
 
+        /// <summary>
+        /// Gets the index of a point, if there is any that coincides with it in the triangulation.
+        /// </summary>
+        /// <param name="point">The point that is expected to exist already.</param>
+        /// <returns>The index of the point. If the point does not exist, -1 is returned.</returns>
         public int GetIndexOfPoint(Vector2 point)
         {
             int index = 0;
@@ -261,6 +375,15 @@ namespace Game.Utils.Math
             return index == m_points.Count ? -1 : index;
         }
 
+        /// <summary>
+        /// Given an edge AB, it searches for the triangle that has an edge with the same vertices in the same order.
+        /// </summary>
+        /// <remarks>
+        /// Remember that the vertices of a triangle are sorted counter-clockwise.
+        /// </remarks>
+        /// <param name="edgeVertexA">The index of the first vertex of the edge.</param>
+        /// <param name="edgeVertexB">The index of the second vertex of the edge.</param>
+        /// <returns>The data of the triangle.</returns>
         public DelaunayTriangleEdge FindTriangleThatContainsEdge(int edgeVertexA, int edgeVertexB)
         {
             DelaunayTriangleEdge foundTriangle = new DelaunayTriangleEdge(NOT_FOUND, NOT_FOUND, edgeVertexA, edgeVertexB);
@@ -281,6 +404,12 @@ namespace Game.Utils.Math
             return foundTriangle;
         }
 
+        /// <summary>
+        /// Given a point, it searches for a triangle that contains it.
+        /// </summary>
+        /// <param name="point">The point expected to be contained by a triangle.</param>
+        /// <param name="startTriangle">The index of the first triangle to check.</param>
+        /// <returns>The index of the triangle that contains the point.</returns>
         public int FindTriangleThatContainsPoint(Vector2 point, int startTriangle)
         { 
             bool isTriangleFound = false;
@@ -306,6 +435,12 @@ namespace Game.Utils.Math
             return triangleIndex;
         }
 
+        /// <summary>
+        /// Given an edge AB, it searches for a triangle that contains the first point and the beginning of the edge.
+        /// </summary>
+        /// <param name="endpointAIndex">The index of the first point.</param>
+        /// <param name="endpointBIndex">The index of the second point.</param>
+        /// <returns>The index of the triangle that contains the first line endpoint.</returns>
         public int FindTriangleThatContainsLineEndpoint(int endpointAIndex, int endpointBIndex)
         {
             List<int> trianglesWithEndpoint = new List<int>();
@@ -322,8 +457,8 @@ namespace Game.Utils.Math
                 //List<int> pointsDebug = triangleDebug.DebugP;
 
                 int vertexPositionInTriangle = m_triangleVertices[trianglesWithEndpoint[i] * 3] == endpointAIndex ? 0 
-                                                                                                                 : m_triangleVertices[trianglesWithEndpoint[i] * 3 + 1] == endpointAIndex ? 1 
-                                                                                                                                                                                         : 2;
+                                                                                                                  : m_triangleVertices[trianglesWithEndpoint[i] * 3 + 1] == endpointAIndex ? 1 
+                                                                                                                                                                                           : 2;
                 Vector2 triangleEdgePoint1 = m_points[m_triangleVertices[trianglesWithEndpoint[i] * 3 + (vertexPositionInTriangle + 1) % 3]];
                 Vector2 triangleEdgePoint2 = m_points[m_triangleVertices[trianglesWithEndpoint[i] * 3 + (vertexPositionInTriangle + 2) % 3]];
 
@@ -339,6 +474,11 @@ namespace Game.Utils.Math
             return foundTriangle;
         }
 
+        /// <summary>
+        /// Stores the adjacency data of a triangle.
+        /// </summary>
+        /// <param name="triangleIndex">The index of the triangle whose adjacency data is to be written.</param>
+        /// <param name="adjacentsToTriangle">The adjacency data, 3 triangle indices sorted counter-clockwise.</param>
         public void SetTriangleAdjacency(int triangleIndex, int* adjacentsToTriangle)
         {
             for(int i = 0; i < 3; ++i)
@@ -347,6 +487,12 @@ namespace Game.Utils.Math
             }
         }
 
+        /// <summary>
+        /// Given a triangle, it searches for an adjacent triangle and replaces it with another adjacent triangle.
+        /// </summary>
+        /// <param name="triangleIndex">The index of the triangle whose adjacency data is to be modified.</param>
+        /// <param name="oldAdjacentTriangle">The index of the adjacent triangle to be replaced.</param>
+        /// <param name="newAdjacentTriangle">The new index of an adjacent triangle that will replace the existing one.</param>
         public void ReplaceAdjacent(int triangleIndex, int oldAdjacentTriangle, int newAdjacentTriangle)
         {
             for(int i = 0; i < 3; ++i)
@@ -358,6 +504,11 @@ namespace Game.Utils.Math
             }
         }
 
+        /// <summary>
+        /// Replaces all the data of a given triangle. The index of the triangle will remain the same.
+        /// </summary>
+        /// <param name="triangleIndex">The index of the triangle whose data is to be replaced.</param>
+        /// <param name="newTriangle">The new data that will replace the existing one.</param>
         public void ReplaceTriangle(int triangleToReplace, DelaunayTriangle newTriangle)
         {
             for(int i = 0; i < 3; ++i)

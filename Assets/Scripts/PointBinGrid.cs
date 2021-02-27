@@ -1,25 +1,58 @@
+// Copyright 2021 Alejandro Villalba Avila
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), 
+// to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+// and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS 
+// IN THE SOFTWARE.
 
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace Game.Utils.Math
 {
+    /// <summary>
+    /// A data structure that sorts a list of points by their proximity. It is a grid that divides the 2D space in NxN cells, 
+    /// each of them acting as a "bin" that contains points.
+    /// </summary>
     public class PointBinGrid
     {
-        public List<Vector2>[] cells;
+        /// <summary>
+        /// The cells of the grid. Each of them may or may not store a bin with points.
+        /// </summary>
+        public List<Vector2>[] Cells;
 
+        // The size of a cell in 2D space.
         private Vector2 m_cellSize;
+
+        // The size of the grid in the 2D space.
         private Vector2 m_gridSize; // Xmax, Ymax
+
+        // The amount of cells per side.
         private int m_cellsPerSide; // n
 
+        /// <summary>
+        /// Constructore that receives the amount of cells per side of the grid, and the size of the grid in the 2D space.
+        /// </summary>
+        /// <param name="cellsPerSide">The amount of cells per side of the grid.</param>
+        /// <param name="gridSize">The size of the grid in the 2D space.</param>
         public PointBinGrid(int cellsPerSide, Vector2 gridSize)
         {
-            cells = new List<Vector2>[cellsPerSide * cellsPerSide];
+            Cells = new List<Vector2>[cellsPerSide * cellsPerSide];
             m_cellSize = gridSize / cellsPerSide;
             m_gridSize = gridSize;
             m_cellsPerSide = cellsPerSide;
         }
 
+        /// <summary>
+        /// Adds a point to a bin of the grid, according to its position in 2D space.
+        /// </summary>
+        /// <param name="newPoint">The point to add.</param>
         public void AddPoint(Vector2 newPoint)
         {
             int rowIndex = (int)(0.99f * m_cellsPerSide * newPoint.y / m_gridSize.y); // i
@@ -38,12 +71,12 @@ namespace Game.Utils.Math
 
             binIndex--; // zero-based index
 
-            if (cells[binIndex] == null)
+            if (Cells[binIndex] == null)
             {
-                cells[binIndex] = new List<Vector2>();
+                Cells[binIndex] = new List<Vector2>();
             }
 
-            cells[binIndex].Add(newPoint);
+            Cells[binIndex].Add(newPoint);
 
             //DrawPointAddition(newPoint, columnIndex, rowIndex);
         }

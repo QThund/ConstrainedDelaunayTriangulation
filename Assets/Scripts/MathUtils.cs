@@ -4,13 +4,33 @@ namespace Game.Utils.Math
 {
 	public static class MathUtils
     {
+		/// <summary>
+		/// Calculates the determinan of a 3 columns x 3 rows matrix.
+		/// </summary>
+		/// <param name="m00">The element at position (0, 0).</param>
+		/// <param name="m10">The element at position (1, 0).</param>
+		/// <param name="m20">The element at position (2, 0).</param>
+		/// <param name="m01">The element at position (0, 1).</param>
+		/// <param name="m11">The element at position (1, 1).</param>
+		/// <param name="m21">The element at position (2, 1).</param>
+		/// <param name="m02">The element at position (0, 2).</param>
+		/// <param name="m12">The element at position (1, 2).</param>
+		/// <param name="m22">The element at position (2, 2).</param>
+		/// <returns>The determinant.</returns>
 		public static float CalculateMatrix3x3Determinant(float m00, float m10, float m20,
-												  float m01, float m11, float m21,
-												  float m02, float m12, float m22)
+														  float m01, float m11, float m21,
+														  float m02, float m12, float m22)
 		{
 			return m00 * m11 * m22 + m10 * m21 * m02 + m20 * m01 * m12 - m20 * m11 * m02 - m10 * m01 * m22 - m00 * m21 * m12;
 		}
 
+		/// <summary>
+		/// Checks whether a point lays on the right side of an edge.
+		/// </summary>
+		/// <param name="edgeEndpointA">The first point of the edge.</param>
+		/// <param name="edgeEndpointB">The second point of the edge.</param>
+		/// <param name="point">The point to check.</param>
+		/// <returns>True if the point is on the right side; False if the point is on the left side or is contained in the edge.</returns>
 		public static bool IsPointToTheRightOfEdge(Vector2 edgeEndpointA, Vector2 edgeEndpointB, Vector2 point)
         {
 			Vector2 aToB = edgeEndpointB - edgeEndpointA;
@@ -19,6 +39,14 @@ namespace Game.Utils.Math
 			return ab_x_p.z < -0.0001f; // Note: Due to extremely small negative values were causing wrong results, a tolerance is used instead of zero
 		}
 
+		/// <summary>
+		/// Checks whether a point is contained in a triangle. The vertices of the triangle must be sorted counter-clockwise.
+		/// </summary>
+		/// <param name="triangleP0">The first vertex of the triangle.</param>
+		/// <param name="triangleP1">The second vertex of the triangle.</param>
+		/// <param name="triangleP2">The third vertex of the triangle.</param>
+		/// <param name="pointToCheck">The point that may be contained.</param>
+		/// <returns>True if the point is contained in the triangle; false otherwise.</returns>
 		public static bool IsPointInsideTriangle(Vector2 triangleP0, Vector2 triangleP1, Vector2 triangleP2, Vector2 pointToCheck)
 		{ 
 			Vector3 ab_x_p = Vector3.Cross(triangleP1 - triangleP0, pointToCheck);
@@ -49,9 +77,19 @@ namespace Game.Utils.Math
 			return determinant >= 0; // zero means on the perimeter
 		}
 
-		// https://stackoverflow.com/questions/4543506/algorithm-for-intersection-of-2-lines
+		/// <summary>
+		/// Calculates whether 2 line segments intersect and the intersection point.
+		/// </summary>
+		/// <param name="endpointA1">The first point of the first segment.</param>
+		/// <param name="endpointB1">The second point of the first segment.</param>
+		/// <param name="endpointA2">The first point of the second segment.</param>
+		/// <param name="endpointB2">The second point of the second segment.</param>
+		/// <param name="intersectionPoint">The intersection point, if any.</param>
+		/// <returns>True if the line segment intersect; False otherwise.</returns>
 		public static bool InsersectionBetweenLines(Vector2 endpointA1, Vector2 endpointB1, Vector2 endpointA2, Vector2 endpointB2, out Vector2 intersectionPoint)
         {
+			// https://stackoverflow.com/questions/4543506/algorithm-for-intersection-of-2-lines
+
 			intersectionPoint = new Vector2(float.MaxValue, float.MaxValue);
 
 			bool isLine1Vertical = endpointB1.x == endpointA1.x;
