@@ -14,7 +14,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Game.Utils.Math
+namespace Game.Utils.Triangulation
 {
     /// <summary>
     /// A data structure that sorts a list of points by their proximity. It is a grid that divides the 2D space in NxN cells, 

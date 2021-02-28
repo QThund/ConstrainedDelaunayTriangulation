@@ -13,7 +13,7 @@
 
 using System.Collections.Generic;
 
-namespace Game.Utils.Math
+namespace Game.Utils.Triangulation
 {
     /// <summary>
     /// Data tha describe a triangle and its context in a triangulation.
