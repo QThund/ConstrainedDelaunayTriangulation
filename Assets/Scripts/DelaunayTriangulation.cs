@@ -59,6 +59,8 @@ namespace Game.Utils.Triangulation
         /// It does not matter if the polugons are convex or concave. It is preferable that holes lay inside the main point cloud.</param>
         public void Triangulate(List<Vector2> inputPoints, List<Triangle2D> outputTriangles, List<List<Vector2>> constrainedEdges = null)
         {
+            float startTime = Time.realtimeSinceStartup;
+
             // Initialize containers
             outputTriangles.Clear();
             outputTriangles.Capacity = inputPoints.Count - 2;
@@ -209,6 +211,8 @@ namespace Game.Utils.Triangulation
                     outputTriangles.Add(new Triangle2D(denormalizedPoints[triangle.p[0]], denormalizedPoints[triangle.p[1]], denormalizedPoints[triangle.p[2]]));
                 }
             }
+
+            Debug.Log("Total time: " + (Time.realtimeSinceStartup - startTime).ToString("F6"));
             
             //m_triangles.LogDump();
         }
