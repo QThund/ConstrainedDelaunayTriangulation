@@ -33,10 +33,10 @@ namespace Game.Utils.Triangulation
         protected List<int> m_triangleVertices;
 
         /// <summary>
-        /// The real points.
+        /// The real points in the 2D space.
         /// </summary>
         protected List<Vector2> m_points;
-
+        
         // Indicates that the index of a vertex, edge or triangle is not defined or was not found
         protected const int NOT_FOUND = -1;
 
@@ -70,9 +70,21 @@ namespace Game.Utils.Triangulation
         /// <param name="expectedTriangles">The expected number of triangles to store.</param>
         public void SetCapacity(int expectedTriangles)
         {
-            m_adjacentTriangles.Capacity = expectedTriangles * 3;
-            m_triangleVertices.Capacity = expectedTriangles * 3;
-            m_points.Capacity = expectedTriangles;
+            if(m_adjacentTriangles.Capacity < expectedTriangles * 3)
+            {
+                m_adjacentTriangles.Capacity = expectedTriangles * 3;
+            }
+            
+            if(m_triangleVertices.Capacity < expectedTriangles * 3)
+            {
+                m_triangleVertices.Capacity = expectedTriangles * 3;
+            }
+
+            if(m_triangleVertices.Capacity < expectedTriangles * 3)
+            {
+                m_points.Capacity = expectedTriangles;
+            }
+            
         }
 
         /// <summary>
@@ -518,6 +530,107 @@ namespace Game.Utils.Triangulation
                 m_adjacentTriangles[triangleToReplace * 3 + i] = newTriangle.adjacent[i];
             }
         }
+
+        /// <summary>
+        /// Generates a graph in which triangle vertices are nodes and triangle edges are the lines that connect the nodes. For each vertex/node, the vertices of all the
+        /// triangles that have such vertex are its neighbors.
+        /// </summary>
+        /// <param name="outputNodeGraph">The node graph to fill. It will be emptied before added the new nodes.</param>
+        /// <param name="trianglesToIgnore">The indices (in ascending order) of the triangles that must not be considerated during the node generation process.</param>
+        /*public void GenerateNodeGraph(NodeGraphData outputNodeGraph, List<int> sortedTrianglesToIgnore)
+        {
+            // Initializes the containers to avoid reserving memory during the process
+            if(outputNodeGraph.Nodes == null)
+            {
+                outputNodeGraph.Nodes = new List<NodeGraphData.Node>(m_points.Count);
+            }
+            else
+            {
+                outputNodeGraph.Nodes.Clear();
+
+                if(outputNodeGraph.Nodes.Capacity < m_points.Count)
+                {
+                    outputNodeGraph.Nodes.Capacity = m_points.Count;
+                }
+            }
+
+            if(outputNodeGraph.Neighbors == null)
+            {
+                outputNodeGraph.Neighbors = new List<NodeGraphData.Neighbor>(m_points.Count + 1);
+            }
+            else
+            {
+                outputNodeGraph.Neighbors.Clear();
+
+                if (outputNodeGraph.Neighbors.Capacity < m_points.Count + 1)
+                {
+                    outputNodeGraph.Neighbors.Capacity = m_points.Count + 1;
+                }
+            }
+            
+            // For each vertex, it creates a node and searches for its neighbors
+            for(int i = 0; i < m_points.Count; ++i)
+            {
+                bool isTriangleToDiscard = false;
+
+                NodeGraphData.Node newNode = new NodeGraphData.Node() { Index = i,
+                                                                        NeighborCount = 0, 
+                                                                        NeighborStartIndex = outputNodeGraph.Neighbors.Count }; // It assumes no isolated nodes
+
+                for(int j = 0; j < m_triangleVertices.Count; ++j)
+                {
+                    int triangleIndex = j / 3;
+                    int currentVertexInCurrentTriangle = j - triangleIndex * 3;
+
+                    // Check if the triangle must be discarded...
+                    if(currentVertexInCurrentTriangle == 0) // Only compare the first vertex of the triangle
+                    {
+                        for (int k = 0; k < sortedTrianglesToIgnore.Count; ++k)
+                        {
+                            if (sortedTrianglesToIgnore[k] >= triangleIndex) // Stop comparing when the pending triangles have higher index than current
+                            {
+                                isTriangleToDiscard = sortedTrianglesToIgnore[k] == triangleIndex;
+                                break;
+                            }
+                        }
+
+                        if (isTriangleToDiscard)
+                        {
+                            // Jumps to the next triangle
+                            j += 2;
+                            continue;
+                        }
+                    }
+
+                    // If we find a triangle that has the current vertex
+                    if (m_triangleVertices[j] == i)
+                    {
+                        int neighbor1 = triangleIndex * 3 + (currentVertexInCurrentTriangle + 1) % 3;
+                        int neighbor2 = triangleIndex * 3 + (currentVertexInCurrentTriangle + 1) % 3;
+
+                        // The cost is the squared distance
+                        Vector2 fromCurrentToNeighbor1 = m_points[m_triangleVertices[neighbor1]] - m_points[i];
+                        float sqrDistanceToNeighbor1 = fromCurrentToNeighbor1.x * fromCurrentToNeighbor1.x + fromCurrentToNeighbor1.y * fromCurrentToNeighbor1.y;
+                        Vector2 fromCurrentToNeighbor2 = m_points[m_triangleVertices[neighbor2]] - m_points[i];
+                        float sqrDistanceToNeighbor2 = fromCurrentToNeighbor2.x * fromCurrentToNeighbor2.x + fromCurrentToNeighbor2.y * fromCurrentToNeighbor2.y;
+
+                        outputNodeGraph.Neighbors.Add(new NodeGraphData.Neighbor(){ NodeIndex = m_triangleVertices[neighbor1], Cost = sqrDistanceToNeighbor1 });
+                        outputNodeGraph.Neighbors.Add(new NodeGraphData.Neighbor(){ NodeIndex = m_triangleVertices[neighbor2], Cost = sqrDistanceToNeighbor2 });
+
+                        // Jumps to the next triangle
+                        j += 2 - currentVertexInCurrentTriangle;
+                    }
+                }
+
+                newNode.NeighborCount = outputNodeGraph.Neighbors.Count - newNode.NeighborStartIndex;
+
+                // If there are neighbors, it means the point belongs to, at least, 1 triangle that has not been discarded
+                if(newNode.NeighborCount > 0)
+                {
+                    outputNodeGraph.Nodes.Add(newNode);
+                }
+            }
+        }*/
 
         public void DrawTriangle(int triangleIndex, Color color)
         {

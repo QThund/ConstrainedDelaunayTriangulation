@@ -60,7 +60,8 @@ public class DelaunayTriangulationTester : MonoBehaviour
             ExtractPointsFromCollider(ConstrainedEdges, constrainedEdgePoints);
         }
 
-        m_triangulation.Triangulate(pointsToTriangulate, m_outputTriangles, constrainedEdgePoints);
+        m_triangulation.Triangulate(pointsToTriangulate, constrainedEdgePoints);
+        m_triangulation.GetTrianglesDiscardingHoles(m_outputTriangles);
 
         VisualRepresentation.mesh = CreateMeshFromTriangles(m_outputTriangles);
 
@@ -81,7 +82,8 @@ public class DelaunayTriangulationTester : MonoBehaviour
             ExtractPointsFromCollider(TilemapBlockers, constrainedEdgePoints);
         }
 
-        m_triangulation.Triangulate(pointsToTriangulate, m_outputTriangles, constrainedEdgePoints);
+        m_triangulation.Triangulate(pointsToTriangulate, constrainedEdgePoints);
+        m_triangulation.GetTrianglesDiscardingHoles(m_outputTriangles);
 
         VisualRepresentation.mesh = CreateMeshFromTriangles(m_outputTriangles);
 
@@ -141,7 +143,7 @@ public class DelaunayTriangulationTester : MonoBehaviour
         for (int i = 0; i < pathCount; ++i)
         {
             List<Vector2> pathPoints = new List<Vector2>();
-            MainPointCloud.GetPath(i, pathPoints);
+            collider.GetPath(i, pathPoints);
             outputPoints.AddRange(pathPoints);
         }
     }
@@ -153,7 +155,7 @@ public class DelaunayTriangulationTester : MonoBehaviour
         for (int i = 0; i < pathCount; ++i)
         {
             List<Vector2> pathPoints = new List<Vector2>();
-            ConstrainedEdges.GetPath(i, pathPoints);
+            collider.GetPath(i, pathPoints);
             outpuColliderPolygons.Add(pathPoints);
         }
     }
