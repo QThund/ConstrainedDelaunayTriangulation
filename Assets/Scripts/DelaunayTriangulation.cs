@@ -269,16 +269,6 @@ namespace Game.Utils.Triangulation
         }
 
         /// <summary>
-        /// Generates a graph in which triangle vertices are nodes and triangle edges are the lines that connect the nodes. For each vertex/node, the vertices of all the
-        /// triangles that have such vertex are its neighbors. Vertices of triangles that are inside of holes or that exclusively belong to the supertriangle are discarded.
-        /// </summary>
-        /// <param name="outputNodeGraph">The node graph to fill. It will be emptied before added the new nodes.</param>
-        public void GetNodeGraph(NodeGraphData outputNodeGraph)
-        {
-            m_triangleSet.GenerateNodeGraph(outputNodeGraph, m_trianglesToRemove);
-        }
-
-        /// <summary>
         /// Adds a point to the triangulation, which implies splitting a triangle into 3 pieces and checking that all triangles still fulfill the Delaunay constraint.
         /// </summary>
         /// <remarks>
