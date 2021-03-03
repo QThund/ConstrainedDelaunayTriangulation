@@ -75,6 +75,8 @@ namespace Game.Utils.Triangulation
         /// It does not matter if the polugons are convex or concave. It is preferable that holes lay inside the main point cloud.</param>
         public void Triangulate(List<Vector2> inputPoints, List<List<Vector2>> constrainedEdges = null)
         {
+            float startTime = Time.realtimeSinceStartup;
+
             // Initialize containers
             if (m_triangleSet == null)
             {
@@ -107,8 +109,8 @@ namespace Game.Utils.Triangulation
             // 1: Normalization
             m_mainPointCloudBounds = CalculateBoundsWithLeftBottomCornerAtOrigin(inputPoints);
 
-            List<Vector2> normalizedPoints = new List<Vector2>(inputPoints.Count);
-            NormalizePoints(inputPoints, m_mainPointCloudBounds, normalizedPoints);
+            List<Vector2> normalizedPoints = new List<Vector2>(inputPoints);
+            NormalizePoints(normalizedPoints, m_mainPointCloudBounds);
 
             //DelaunayTriangulation.DrawPoints(normalizedPoints, 30.0f);
 
@@ -153,8 +155,8 @@ namespace Game.Utils.Triangulation
                 for(int i = 0; i < constrainedEdges.Count; ++i)
                 {
                     // 5.1: Normalize
-                    List<Vector2> normalizedConstrainedEdges = new List<Vector2>(inputPoints.Count);
-                    NormalizePoints(constrainedEdges[i], m_mainPointCloudBounds, normalizedConstrainedEdges);
+                    List<Vector2> normalizedConstrainedEdges = new List<Vector2>(constrainedEdges[i]);
+                    NormalizePoints(normalizedConstrainedEdges, m_mainPointCloudBounds);
 
                     List<int> polygonEdgeIndices = new List<int>(normalizedConstrainedEdges.Count);
 
@@ -200,10 +202,15 @@ namespace Game.Utils.Triangulation
 
             m_trianglesToRemove.Sort();
 
-            for (int i = 0; i < m_trianglesToRemove.Count; ++i)
-            {
-                m_triangleSet.DrawTriangle(m_trianglesToRemove[i], Color.red);
-            }
+            // 7: Denormalization
+            DenormalizePoints(m_triangleSet.Points, m_mainPointCloudBounds);
+
+            //for (int i = 0; i < m_trianglesToRemove.Count; ++i)
+            //{
+            //    m_triangleSet.DrawTriangle(m_trianglesToRemove[i], Color.red);
+            //}
+
+            Debug.Log("Total time: " + (Time.realtimeSinceStartup - startTime).ToString("F6"));
 
             //m_triangles.LogDump();
         }
@@ -218,10 +225,6 @@ namespace Game.Utils.Triangulation
             {
                 outputTriangles.Capacity = m_triangleSet.TriangleCount;
             }
-
-            // 7: Denormalization
-            List<Vector2> denormalizedPoints = new List<Vector2>(m_triangleSet.TriangleCount);
-            DenormalizePoints(m_triangleSet.Points, m_mainPointCloudBounds, denormalizedPoints);
 
             // 8: Output filtering
             for (int i = 0; i < m_triangleSet.TriangleCount; ++i)
@@ -242,7 +245,7 @@ namespace Game.Utils.Triangulation
                 if (!isTriangleToBeRemoved)
                 {
                     DelaunayTriangle triangle = m_triangleSet.GetTriangle(i);
-                    outputTriangles.Add(new Triangle2D(denormalizedPoints[triangle.p[0]], denormalizedPoints[triangle.p[1]], denormalizedPoints[triangle.p[2]]));
+                    outputTriangles.Add(new Triangle2D(m_triangleSet.Points[triangle.p[0]], m_triangleSet.Points[triangle.p[1]], m_triangleSet.Points[triangle.p[2]]));
                 }
             }
         }
@@ -258,14 +261,10 @@ namespace Game.Utils.Triangulation
                 outputTriangles.Capacity = m_triangleSet.TriangleCount;
             }
 
-            // 7: Denormalization
-            List<Vector2> denormalizedPoints = new List<Vector2>(m_triangleSet.TriangleCount);
-            DenormalizePoints(m_triangleSet.Points, m_mainPointCloudBounds, denormalizedPoints);
-
             for (int i = 0; i < m_triangleSet.TriangleCount; ++i)
             {
                 DelaunayTriangle triangle = m_triangleSet.GetTriangle(i);
-                outputTriangles.Add(new Triangle2D(denormalizedPoints[triangle.p[0]], denormalizedPoints[triangle.p[1]], denormalizedPoints[triangle.p[2]]));
+                outputTriangles.Add(new Triangle2D(m_triangleSet.Points[triangle.p[0]], m_triangleSet.Points[triangle.p[1]], m_triangleSet.Points[triangle.p[2]]));
             }
         }
 
@@ -274,10 +273,10 @@ namespace Game.Utils.Triangulation
         /// triangles that have such vertex are its neighbors. Vertices of triangles that are inside of holes or that exclusively belong to the supertriangle are discarded.
         /// </summary>
         /// <param name="outputNodeGraph">The node graph to fill. It will be emptied before added the new nodes.</param>
-        /*public void GetNodeGraph(NodeGraphData outputNodeGraph)
+        public void GetNodeGraph(NodeGraphData outputNodeGraph)
         {
             m_triangleSet.GenerateNodeGraph(outputNodeGraph, m_trianglesToRemove);
-        }*/
+        }
 
         /// <summary>
         /// Adds a point to the triangulation, which implies splitting a triangle into 3 pieces and checking that all triangles still fulfill the Delaunay constraint.
@@ -704,16 +703,15 @@ namespace Game.Utils.Triangulation
         /// Normalizes a list of points according to a bounding box so all of them lay between the coordinates [0,0] and [1,1], while they conserve their 
         /// relative position with respect to the others.
         /// </summary>
-        /// <param name="inputPoints">The input points to normalize.</param>
+        /// <param name="inputOutputPoints">The input points to normalize. The points in the list will be updated.</param>
         /// <param name="bounds">The bounding box in which the normalization is based.</param>
-        /// <param name="outputNormalizedPoints">The list where the normalized points will be added. Existing points will not be removed. It must not be null.</param>
-        private void NormalizePoints(List<Vector2> inputPoints, Bounds bounds, List<Vector2> outputNormalizedPoints)
+        private void NormalizePoints(List<Vector2> inputOutputPoints, Bounds bounds)
         {
             float maximumDimension = Mathf.Max(bounds.size.x, bounds.size.y);
 
-            for(int i = 0; i < inputPoints.Count; ++i)
+            for(int i = 0; i < inputOutputPoints.Count; ++i)
             {
-                outputNormalizedPoints.Add((inputPoints[i] - (Vector2)bounds.min) / maximumDimension);
+                inputOutputPoints[i] = (inputOutputPoints[i] - (Vector2)bounds.min) / maximumDimension;
             }
         }
 
@@ -721,16 +719,15 @@ namespace Game.Utils.Triangulation
         /// Denormalizes a list of points according to a bounding box so all of them lay between the coordinates determined by such box, while they conserve their 
         /// relative position with respect to the others.
         /// </summary>
-        /// <param name="inputPoints">The input points to denormalize. They are expected to be previously normalized.</param>
+        /// <param name="inputOutputPoints">The points to denormalize. They are expected to be previously normalized. The points in the list will be updated.</param>
         /// <param name="bounds">The bounding box in which the denormalization is based.</param>
-        /// <param name="outputDenormalizedPoints">The list where the denormalized points will be added. Existing points will not be removed. It must not be null.</param>
-        private void DenormalizePoints(List<Vector2> inputPoints, Bounds bounds, List<Vector2> outputDenormalizedPoints)
+        private void DenormalizePoints(List<Vector2> inputOutputPoints, Bounds bounds)
         {
             float maximumDimension = Mathf.Max(bounds.size.x, bounds.size.y);
 
-            for (int i = 0; i < inputPoints.Count; ++i)
+            for (int i = 0; i < inputOutputPoints.Count; ++i)
             {
-                outputDenormalizedPoints.Add(inputPoints[i] * maximumDimension + (Vector2)bounds.min);
+                inputOutputPoints[i] = inputOutputPoints[i] * maximumDimension + (Vector2)bounds.min;
             }
         }
 
