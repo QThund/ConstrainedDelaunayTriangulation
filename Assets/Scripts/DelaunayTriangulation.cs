@@ -71,9 +71,11 @@ namespace Game.Utils.Triangulation
         /// triangulation, formed by closed polygons that do not overlap each other.
         /// </summary>
         /// <param name="inputPoints">The main point cloud. It must contain, at least, 3 points.</param>
+        /// <param name="maximumAreaTesselation">Optional. When it is greater than zero, all the triangles of the main point cloud will be tessellated until none of them occupies 
+        /// an area greater than this value.</param>
         /// <param name="constrainedEdges">Optional. The list of holes. Each hole must be defined by a closed polygon formed by consecutive points sorted counter-clockwise. 
         /// It does not matter if the polugons are convex or concave. It is preferable that holes lay inside the main point cloud.</param>
-        public void Triangulate(List<Vector2> inputPoints, List<List<Vector2>> constrainedEdges = null)
+        public void Triangulate(List<Vector2> inputPoints, float maximumAreaTesselation = 0.0f, List<List<Vector2>> constrainedEdges = null)
         {
             float startTime = Time.realtimeSinceStartup;
 
@@ -146,6 +148,11 @@ namespace Game.Utils.Triangulation
                 }
             }
 
+            if(maximumAreaTesselation > 0.0f)
+            {
+                Tesselate(maximumAreaTesselation);
+            }
+
             // 5: Holes creation (constrained edges)
             if (constrainedEdges != null)
             {
@@ -169,10 +176,10 @@ namespace Game.Utils.Triangulation
                             continue;
                         }
 
+                        //Debug.DrawLine(normalizedConstrainedEdges[j], normalizedConstrainedEdges[(j + 1) % normalizedConstrainedEdges.Count], Color.cyan, 5.0f);
+
                         int addedPointIndex = AddPointToTriangulation(normalizedConstrainedEdges[j]);
                         polygonEdgeIndices.Add(addedPointIndex);
-
-                        Debug.DrawLine(normalizedConstrainedEdges[j], normalizedConstrainedEdges[(j + 1) % normalizedConstrainedEdges.Count], Color.cyan, 5.0f);
                     }
 
                     constrainedEdgeIndices.Add(polygonEdgeIndices);
@@ -207,7 +214,7 @@ namespace Game.Utils.Triangulation
 
             //for (int i = 0; i < m_trianglesToRemove.Count; ++i)
             //{
-            //    m_triangleSet.DrawTriangle(m_trianglesToRemove[i], Color.red);
+            //    m_triangleSet.DrawTriangle(m_trianglesToRemove[i], Color.magenta);
             //}
 
             Debug.Log("Total time: " + (Time.realtimeSinceStartup - startTime).ToString("F6"));
@@ -566,7 +573,7 @@ namespace Game.Utils.Triangulation
 
                     if (newTriangleSharedEdgePointA != edgeEndpointB && newTriangleSharedEdgePointB != edgeEndpointB && // Watch out! It thinks the line intersects with the edge when an endpoint coincides with a triangle vertex, this problem is avoided thanks to this conditions
                         newTriangleSharedEdgePointA != edgeEndpointA && newTriangleSharedEdgePointB != edgeEndpointA &&
-                        MathUtils.InsersectionBetweenLines(edgeEndpointA, edgeEndpointB, newTriangleSharedEdgePointA, newTriangleSharedEdgePointB, out intersectionPoint))
+                        MathUtils.IntersectionBetweenLines(edgeEndpointA, edgeEndpointB, newTriangleSharedEdgePointA, newTriangleSharedEdgePointB, out intersectionPoint))
                     {
                         // New triangles edge still intersects with the constrained edge, so it is returned to the list
                         intersectedTriangleEdges.Insert(0, newEdge);
@@ -718,6 +725,53 @@ namespace Game.Utils.Triangulation
             for (int i = 0; i < inputOutputPoints.Count; ++i)
             {
                 inputOutputPoints[i] = inputOutputPoints[i] * maximumDimension + (Vector2)bounds.min;
+            }
+        }
+
+        /// <summary>
+        /// For each triangle, it splits its edges in 2 pieces, generating 4 subtriangles. The operation is repeated until none of them has an area greater than the desired value.
+        /// </summary>
+        /// <remarks>
+        /// The triangles that exclusively belong to the supertriangle will be ignored.
+        /// </remarks>
+        /// <param name="maximumTriangleArea">The maximum area all the triangles will have after the tessellation.</param>
+        protected void Tesselate(float maximumTriangleArea)
+        {
+            int i = 2; // Skips supertriangle
+
+            while (i < m_triangleSet.TriangleCount - 1)
+            {
+                ++i;
+
+                // Skips all the Supertriangle triangles
+                bool isSupertriangle = false;
+                DelaunayTriangle triangleData = m_triangleSet.GetTriangle(i);
+
+                for (int j = 0; j < 3; ++j)
+                {
+                    if (triangleData.p[j] == 0 || triangleData.p[j] == 1 || triangleData.p[j] == 2) // 0, 1 and 2 are vertices of the supertriangle
+                    {
+                        isSupertriangle = true;
+                        break;
+                    }
+                }
+
+                if (isSupertriangle)
+                {
+                    continue;
+                }
+
+                Triangle2D trianglePoints = m_triangleSet.GetTrianglePoints(i);
+                float triangleArea = MathUtils.CalculateTriangleArea(trianglePoints.p0, trianglePoints.p1, trianglePoints.p2);
+
+                if (triangleArea > maximumTriangleArea)
+                {
+                    AddPointToTriangulation(trianglePoints.p0 + (trianglePoints.p1 - trianglePoints.p0) * 0.5f);
+                    AddPointToTriangulation(trianglePoints.p1 + (trianglePoints.p2 - trianglePoints.p1) * 0.5f);
+                    AddPointToTriangulation(trianglePoints.p2 + (trianglePoints.p0 - trianglePoints.p2) * 0.5f);
+
+                    i = 2; // The tesselation restarts
+                }
             }
         }
 

@@ -42,6 +42,9 @@ public class DelaunayTriangulationTester : MonoBehaviour
     [Tooltip("The mesh that displays the output triangles.")]
     public MeshFilter VisualRepresentation;
 
+    [Tooltip("Enables tesselation (before calculating constrained edges) when greater than zero. It subdivides the triangles until each of them has an area smaller than this value.")]
+    public float TesselationMaximumTriangleArea = 0.0f;
+
     protected List<Triangle2D> m_outputTriangles = new List<Triangle2D>();
 
     protected DelaunayTriangulation m_triangulation = new DelaunayTriangulation();
@@ -60,7 +63,8 @@ public class DelaunayTriangulationTester : MonoBehaviour
             ExtractPointsFromCollider(ConstrainedEdges, constrainedEdgePoints);
         }
 
-        m_triangulation.Triangulate(pointsToTriangulate, constrainedEdgePoints);
+        m_outputTriangles.Clear();
+        m_triangulation.Triangulate(pointsToTriangulate, TesselationMaximumTriangleArea, constrainedEdgePoints);
         m_triangulation.GetTrianglesDiscardingHoles(m_outputTriangles);
 
         VisualRepresentation.mesh = CreateMeshFromTriangles(m_outputTriangles);
@@ -82,7 +86,8 @@ public class DelaunayTriangulationTester : MonoBehaviour
             ExtractPointsFromCollider(TilemapBlockers, constrainedEdgePoints);
         }
 
-        m_triangulation.Triangulate(pointsToTriangulate, constrainedEdgePoints);
+        m_outputTriangles.Clear();
+        m_triangulation.Triangulate(pointsToTriangulate, TesselationMaximumTriangleArea, constrainedEdgePoints);
         m_triangulation.GetTrianglesDiscardingHoles(m_outputTriangles);
 
         VisualRepresentation.mesh = CreateMeshFromTriangles(m_outputTriangles);

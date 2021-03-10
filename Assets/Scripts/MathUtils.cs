@@ -33,8 +33,8 @@ namespace Game.Utils.Math
 		/// <returns>True if the point is on the right side; False if the point is on the left side or is contained in the edge.</returns>
 		public static bool IsPointToTheRightOfEdge(Vector2 edgeEndpointA, Vector2 edgeEndpointB, Vector2 point)
         {
-			Vector2 aToB = edgeEndpointB - edgeEndpointA;
-			Vector2 aToP = point - edgeEndpointA;
+			Vector2 aToB = (edgeEndpointB - edgeEndpointA).normalized; // Normalization is quite important to avoid precision loss!
+			Vector2 aToP = (point - edgeEndpointA).normalized;
 			Vector3 ab_x_p = Vector3.Cross(aToB, aToP);
 			return ab_x_p.z < -0.0001f; // Note: Due to extremely small negative values were causing wrong results, a tolerance is used instead of zero
 		}
@@ -86,7 +86,7 @@ namespace Game.Utils.Math
 		/// <param name="endpointB2">The second point of the second segment.</param>
 		/// <param name="intersectionPoint">The intersection point, if any.</param>
 		/// <returns>True if the line segment intersect; False otherwise.</returns>
-		public static bool InsersectionBetweenLines(Vector2 endpointA1, Vector2 endpointB1, Vector2 endpointA2, Vector2 endpointB2, out Vector2 intersectionPoint)
+		public static bool IntersectionBetweenLines(Vector2 endpointA1, Vector2 endpointB1, Vector2 endpointA2, Vector2 endpointB2, out Vector2 intersectionPoint)
         {
 			// https://stackoverflow.com/questions/4543506/algorithm-for-intersection-of-2-lines
 
@@ -213,6 +213,21 @@ namespace Game.Utils.Math
 
 			return isConvex;
 		}
+
+		/// <summary>
+		/// Calcualtes the area of a triangle, according to its 3 vertices.
+		/// </summary>
+		/// <remarks>
+		/// It does not matter whether the vertices are sorted counter-clockwise.
+		/// </remarks>
+		/// <param name="p0">The first vertex.</param>
+		/// <param name="p1">The second vertex.</param>
+		/// <param name="p2">The third vertex.</param>
+		/// <returns>The area of the triangle.</returns>
+		public static float CalculateTriangleArea(Vector2 p0, Vector2 p1, Vector2 p2)
+        {
+			return Vector3.Cross(p1 - p0, p2 - p0).magnitude * 0.5f;
+        }
 	}
 }
 

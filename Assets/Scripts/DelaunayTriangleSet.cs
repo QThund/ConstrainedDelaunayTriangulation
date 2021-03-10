@@ -315,7 +315,7 @@ namespace Game.Utils.Triangulation
                 for (int i = 0; i < 3; ++i)
                 {
                     if (m_points[m_triangleVertices[triangleIndex * 3 + i]] == lineEndpointB ||
-                       m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]] == lineEndpointB)
+                        m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]] == lineEndpointB)
                     {
                         isTriangleContainingBFound = true;
                         break;
@@ -329,11 +329,11 @@ namespace Game.Utils.Triangulation
 
                         Vector2 intersectionPoint;
 
-                        if (MathUtils.InsersectionBetweenLines(m_points[m_triangleVertices[triangleIndex * 3 + i]],
-                                                                   m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]],
-                                                                   lineEndpointA,
-                                                                   lineEndpointB,
-                                                                   out intersectionPoint))
+                        if (MathUtils.IntersectionBetweenLines(m_points[m_triangleVertices[triangleIndex * 3 + i]],
+                                                               m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]],
+                                                               lineEndpointA,
+                                                               lineEndpointB,
+                                                               out intersectionPoint))
                         {
                             hasCrossedEdge = true;
 
@@ -427,8 +427,9 @@ namespace Game.Utils.Triangulation
         { 
             bool isTriangleFound = false;
             int triangleIndex = startTriangle;
-            
-            while(!isTriangleFound)
+            int checkedTriangles = 0; 
+
+            while(!isTriangleFound && checkedTriangles < TriangleCount)
             {
                 isTriangleFound = true;
 
@@ -438,13 +439,20 @@ namespace Game.Utils.Triangulation
                     {
                         // The point is in the exterior of the triangle (vertices are sorted CCW, the right side is always the exterior from the perspective of the A->B edge)
                         triangleIndex = m_adjacentTriangles[triangleIndex * 3 + i];
-                        
+
                         isTriangleFound = false;
                         break;
                     }
                 }
+
+                checkedTriangles++;
             }
-            
+
+            if(checkedTriangles >= TriangleCount && TriangleCount > 1)
+            {
+                Debug.LogError("Unable to find a triangle that contains the point (" + point.ToString("F6") + "), starting at triangle " + startTriangle + ". Are you generating very small triangles?");
+            }
+
             return triangleIndex;
         }
 
