@@ -77,7 +77,7 @@ namespace Game.Utils.Triangulation
         /// It does not matter if the polugons are convex or concave. It is preferable that holes lay inside the main point cloud.</param>
         public void Triangulate(List<Vector2> inputPoints, float maximumAreaTesselation = 0.0f, List<List<Vector2>> constrainedEdges = null)
         {
-            float startTime = Time.realtimeSinceStartup;
+            //float startTime = Time.realtimeSinceStartup;
 
             // Initialize containers
             if (m_triangleSet == null)
@@ -125,7 +125,7 @@ namespace Game.Utils.Triangulation
                 m_grid.AddPoint(normalizedPoints[i]);
             }
 
-            m_grid.DrawGrid(new Color(0.0f, 0.0f, 1.0f, 0.2f), 10.0f);
+            //m_grid.DrawGrid(new Color(0.0f, 0.0f, 1.0f, 0.2f), 10.0f);
 
             // 3: Supertriangle initialization
             Triangle2D supertriangle = new Triangle2D(new Vector2(-100.0f, -100.0f), new Vector2(100.0f, -100.0f), new Vector2(0.0f, 100.0f)); // CCW
@@ -217,7 +217,7 @@ namespace Game.Utils.Triangulation
             //    m_triangleSet.DrawTriangle(m_trianglesToRemove[i], Color.magenta);
             //}
 
-            Debug.Log("Total time: " + (Time.realtimeSinceStartup - startTime).ToString("F6"));
+            //Debug.Log("Total time: " + (Time.realtimeSinceStartup - startTime).ToString("F6"));
 
             //m_triangles.LogDump();
         }

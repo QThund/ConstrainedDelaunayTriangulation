@@ -88,13 +88,24 @@ namespace Game.Utils.Triangulation
         }
 
         /// <summary>
-        /// Gets the amount of points stored.
+        /// Gets all the points of the stored triangles.
         /// </summary>
         public List<Vector2> Points
         {
             get
             {
                 return m_points;
+            }
+        }
+
+        /// <summary>
+        /// Gets the indices of the vertices of all the stored triangles.
+        /// </summary>
+        public List<int> Triangles
+        {
+            get
+            {
+                return m_triangleVertices;
             }
         }
 
@@ -307,7 +318,7 @@ namespace Game.Utils.Triangulation
 
             while (!isTriangleContainingBFound)
             {
-                DrawTriangle(triangleIndex, Color.green);
+                //DrawTriangle(triangleIndex, Color.green);
 
                 bool hasCrossedEdge = false;
                 int tentativeAdjacentTriangle = NO_ADJACENT_TRIANGLE;
@@ -325,7 +336,7 @@ namespace Game.Utils.Triangulation
                     {
                         tentativeAdjacentTriangle = i;
 
-                        Debug.DrawLine(m_points[m_triangleVertices[triangleIndex * 3 + i]], m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]], Color.green, 10.0f);
+                        //Debug.DrawLine(m_points[m_triangleVertices[triangleIndex * 3 + i]], m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]], Color.green, 10.0f);
 
                         Vector2 intersectionPoint;
 
@@ -470,7 +481,7 @@ namespace Game.Utils.Triangulation
             int foundTriangle = NOT_FOUND;
             Vector2 endpointA = m_points[endpointAIndex];
             Vector2 endpointB = m_points[endpointBIndex];
-            Debug.DrawLine(endpointA + Vector2.up * 0.01f, endpointB + Vector2.up * 0.01f, Color.yellow, 10.0f);
+            //Debug.DrawLine(endpointA + Vector2.up * 0.01f, endpointB + Vector2.up * 0.01f, Color.yellow, 10.0f);
 
             for (int i = 0; i < trianglesWithEndpoint.Count; ++i)
             {
