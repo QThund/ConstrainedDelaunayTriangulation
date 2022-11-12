@@ -372,7 +372,7 @@ namespace Game.Utils.Triangulation
         /// <param name="adjacentTrianglesToProcess">Initial set of triangles to check.</param>
         private void FulfillDelaunayConstraint(Stack<int> adjacentTrianglesToProcess)
         {
-            var triangleOppositeMap = new Dictionary<int, int>();
+            Dictionary<int, int> triangleOppositeMap = new Dictionary<int, int>();
             
             while(adjacentTrianglesToProcess.Count > 0)
             {
@@ -401,35 +401,35 @@ namespace Game.Utils.Triangulation
                     int sharedEdgeVertexLocalIndex = GetSharedEdge(oppositeTriangle, currentTriangleToSwap);
 
                     // Adds the 2 triangles that were adjacent to the opposite triangle, to be processed too
-                    var oppositeAdjacent0 = oppositeTriangle.adjacent[(sharedEdgeVertexLocalIndex + 1) % 3]; 
+                    int oppositeAdjacent0 = oppositeTriangle.adjacent[(sharedEdgeVertexLocalIndex + 1) % 3]; 
                     if (oppositeAdjacent0 != NO_ADJACENT_TRIANGLE && !adjacentTrianglesToProcess.Contains(oppositeAdjacent0))
                     {
                         adjacentTrianglesToProcess.Push(oppositeAdjacent0);
-                        var neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(oppositeAdjacent0), triangle.adjacent[OPPOSITE_TRIANGLE_INDEX]);
+                        int neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(oppositeAdjacent0), triangle.adjacent[OPPOSITE_TRIANGLE_INDEX]);
                         triangleOppositeMap.Add(oppositeAdjacent0, neighborEdge);
                     }
 
-                    var oppositeAdjacent1 = oppositeTriangle.adjacent[(sharedEdgeVertexLocalIndex + 2) % 3];
+                    int oppositeAdjacent1 = oppositeTriangle.adjacent[(sharedEdgeVertexLocalIndex + 2) % 3];
                     if (oppositeAdjacent1 != NO_ADJACENT_TRIANGLE && !adjacentTrianglesToProcess.Contains(oppositeAdjacent1))
                     {
                         adjacentTrianglesToProcess.Push(oppositeAdjacent1);
-                        var neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(oppositeAdjacent1), triangle.adjacent[OPPOSITE_TRIANGLE_INDEX]);
+                        int neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(oppositeAdjacent1), triangle.adjacent[OPPOSITE_TRIANGLE_INDEX]);
                         triangleOppositeMap.Add(oppositeAdjacent1, neighborEdge);
                     }
 
-                    var triangleAdjacent0 = triangle.adjacent[NOT_IN_EDGE_VERTEX_INDEX];
+                    int triangleAdjacent0 = triangle.adjacent[NOT_IN_EDGE_VERTEX_INDEX];
                     if (triangleAdjacent0 != NO_ADJACENT_TRIANGLE && !adjacentTrianglesToProcess.Contains(triangleAdjacent0))
                     {
                         adjacentTrianglesToProcess.Push(triangleAdjacent0);
-                        var neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(triangleAdjacent0), currentTriangleToSwap);
+                        int neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(triangleAdjacent0), currentTriangleToSwap);
                         triangleOppositeMap.Add(triangleAdjacent0, neighborEdge);
                     }
 
-                    var triangleAdjacent1 = triangle.adjacent[(NOT_IN_EDGE_VERTEX_INDEX + 2) % 3];
+                    int triangleAdjacent1 = triangle.adjacent[(NOT_IN_EDGE_VERTEX_INDEX + 2) % 3];
                     if (triangleAdjacent1 != NO_ADJACENT_TRIANGLE && !adjacentTrianglesToProcess.Contains(triangleAdjacent1))
                     {
                         adjacentTrianglesToProcess.Push(triangleAdjacent1);
-                        var neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(triangleAdjacent1), currentTriangleToSwap);
+                        int neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(triangleAdjacent1), currentTriangleToSwap);
                         triangleOppositeMap.Add(triangleAdjacent1, neighborEdge);
                     }
                     
@@ -439,9 +439,15 @@ namespace Game.Utils.Triangulation
             }
         }
 
+        /// <summary>
+        /// Finds the the index of the edge (0 to 2) of a triangle that is shared with another triangle.
+        /// </summary>
+        /// <param name="triangle">The triangle whose edge is to be returned.</param>
+        /// <param name="adjacentTriangle">The index of the adjacent triangle.</param>
+        /// <returns>The index of the shared edge in the first triangle, from 0 to 2.</returns>
         private int GetSharedEdge(DelaunayTriangle triangle, int adjacentTriangle)
         {
-            for (var sharedEdgeVertexLocalIndex = 0; sharedEdgeVertexLocalIndex < 3; ++sharedEdgeVertexLocalIndex)
+            for (int sharedEdgeVertexLocalIndex = 0; sharedEdgeVertexLocalIndex < 3; ++sharedEdgeVertexLocalIndex)
             {
                 if (triangle.adjacent[sharedEdgeVertexLocalIndex] == adjacentTriangle)
                 {
