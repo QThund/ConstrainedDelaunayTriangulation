@@ -54,6 +54,10 @@ namespace Game.Utils.Triangulation
         // The stack of adjacent triangles, used when checking for the Delaunay constraint
         protected Stack<int> m_adjacentTriangleStack;
 
+        // A stack, parallel to the adjacent triangles stack, that contains the local index [0, 2] of the edge shared among the adjacent triangle
+        // of the other stack and the triangle that was processed before it
+        protected Stack<int> m_adjacentTriangleEdgeStack;
+
         // Indicates that the index of a vertex, edge or triangle is not defined or was not found
         protected const int NOT_FOUND = -1;
 
@@ -93,10 +97,12 @@ namespace Game.Utils.Triangulation
             if(m_adjacentTriangleStack == null)
             {
                 m_adjacentTriangleStack = new Stack<int>(inputPoints.Count - 2);
+                m_adjacentTriangleEdgeStack = new Stack<int>(inputPoints.Count - 2);
             }
             else
             {
                 m_adjacentTriangleStack.Clear();
+                m_adjacentTriangleEdgeStack.Clear();
             }
 
             if(m_trianglesToRemove == null)
@@ -347,20 +353,23 @@ namespace Game.Utils.Triangulation
             if(containingTriangle.adjacent[1] != NO_ADJACENT_TRIANGLE) // If they do not have an opposite triangle in the outter edge, there is no need to check the Delaunay constraint for it
             {
                 m_adjacentTriangleStack.Push(containingTriangleIndex);
+                m_adjacentTriangleEdgeStack.Push(1);
             }
 
             if(newTriangle1.adjacent[1] != NO_ADJACENT_TRIANGLE)
             {
                 m_adjacentTriangleStack.Push(triangle1Index);
+                m_adjacentTriangleEdgeStack.Push(1);
             }
 
             if (newTriangle2.adjacent[1] != NO_ADJACENT_TRIANGLE)
             {
                 m_adjacentTriangleStack.Push(triangle2Index);
+                m_adjacentTriangleEdgeStack.Push(1);
             }
 
             // 4.7: Check Delaunay constraint
-            FulfillDelaunayConstraint(m_adjacentTriangleStack);
+            FulfillDelaunayConstraint(m_adjacentTriangleStack, m_adjacentTriangleEdgeStack);
 
             return insertedPoint;
         }
@@ -370,19 +379,16 @@ namespace Game.Utils.Triangulation
         /// The adjacent triangles of the processed triangles are added to the stack too, so the check propagates until they all fulfill the condition.
         /// </summary>
         /// <param name="adjacentTrianglesToProcess">Initial set of triangles to check.</param>
-        private void FulfillDelaunayConstraint(Stack<int> adjacentTrianglesToProcess)
+        /// <param name="adjacentTriangleEdges">The local index (0 to 2) of the edges shared among the triangles in adjacentTrianglesToProcess and the triangles that preceded
+        /// them at the moment they were added. There is one edge per triangle.</param>
+        private void FulfillDelaunayConstraint(Stack<int> adjacentTrianglesToProcess, Stack<int> adjacentTriangleEdges)
         {
-            Dictionary<int, int> triangleOppositeMap = new Dictionary<int, int>();
-            
             while(adjacentTrianglesToProcess.Count > 0)
             {
                 int currentTriangleToSwap = adjacentTrianglesToProcess.Pop();
                 DelaunayTriangle triangle = m_triangleSet.GetTriangle(currentTriangleToSwap);
 
-                int OPPOSITE_TRIANGLE_INDEX = 1;
-                if (triangleOppositeMap.ContainsKey(currentTriangleToSwap))
-                    OPPOSITE_TRIANGLE_INDEX = triangleOppositeMap[currentTriangleToSwap];
-                triangleOppositeMap.Remove(currentTriangleToSwap);
+                int OPPOSITE_TRIANGLE_INDEX = adjacentTriangleEdges.Pop();
 
                 if(triangle.adjacent[OPPOSITE_TRIANGLE_INDEX] == NO_ADJACENT_TRIANGLE)
                 {
@@ -406,7 +412,7 @@ namespace Game.Utils.Triangulation
                     {
                         adjacentTrianglesToProcess.Push(oppositeAdjacent0);
                         int neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(oppositeAdjacent0), triangle.adjacent[OPPOSITE_TRIANGLE_INDEX]);
-                        triangleOppositeMap.Add(oppositeAdjacent0, neighborEdge);
+                        adjacentTriangleEdges.Push(neighborEdge);
                     }
 
                     int oppositeAdjacent1 = oppositeTriangle.adjacent[(sharedEdgeVertexLocalIndex + 2) % 3];
@@ -414,7 +420,7 @@ namespace Game.Utils.Triangulation
                     {
                         adjacentTrianglesToProcess.Push(oppositeAdjacent1);
                         int neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(oppositeAdjacent1), triangle.adjacent[OPPOSITE_TRIANGLE_INDEX]);
-                        triangleOppositeMap.Add(oppositeAdjacent1, neighborEdge);
+                        adjacentTriangleEdges.Push(neighborEdge);
                     }
 
                     int triangleAdjacent0 = triangle.adjacent[NOT_IN_EDGE_VERTEX_INDEX];
@@ -422,7 +428,7 @@ namespace Game.Utils.Triangulation
                     {
                         adjacentTrianglesToProcess.Push(triangleAdjacent0);
                         int neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(triangleAdjacent0), currentTriangleToSwap);
-                        triangleOppositeMap.Add(triangleAdjacent0, neighborEdge);
+                        adjacentTriangleEdges.Push(neighborEdge);
                     }
 
                     int triangleAdjacent1 = triangle.adjacent[(NOT_IN_EDGE_VERTEX_INDEX + 2) % 3];
@@ -430,7 +436,7 @@ namespace Game.Utils.Triangulation
                     {
                         adjacentTrianglesToProcess.Push(triangleAdjacent1);
                         int neighborEdge = GetSharedEdge(m_triangleSet.GetTriangle(triangleAdjacent1), currentTriangleToSwap);
-                        triangleOppositeMap.Add(triangleAdjacent1, neighborEdge);
+                        adjacentTriangleEdges.Push(neighborEdge);
                     }
                     
                     // 4.8: Swap edges
