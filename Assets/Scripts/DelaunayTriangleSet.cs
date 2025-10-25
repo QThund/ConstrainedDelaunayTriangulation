@@ -233,7 +233,9 @@ namespace Game.Utils.Triangulation
             for (int i = 0; i < polygonOutline.Count; ++i)
             {
                 // For every edge, it gets the inner triangle that contains such edge
-                DelaunayTriangleEdge triangleEdge = FindTriangleThatContainsEdge(polygonOutline[i], polygonOutline[(i + 1) % polygonOutline.Count]);
+                int currEdgeVertexA = polygonOutline[i];
+                int currEdgeVertexB = polygonOutline[(i + 1) % polygonOutline.Count];
+                DelaunayTriangleEdge triangleEdge = FindTriangleThatContainsEdge(currEdgeVertexA, currEdgeVertexB);
 
                 // A triangle may form a corner, with 2 consecutive outline edges. This avoids adding it twice
                 if(outputTrianglesInPolygon.Count > 0 &&
@@ -264,7 +266,9 @@ namespace Game.Utils.Triangulation
                         if ((currentTriangleEdgeVertexA == previousOutlineEdgeVertexA && currentTriangleEdgeVertexB == previousOutlineEdgeVertexB) ||
                             (currentTriangleEdgeVertexA == previousOutlineEdgeVertexB && currentTriangleEdgeVertexB == previousOutlineEdgeVertexA) ||
                             (currentTriangleEdgeVertexA == nextOutlineEdgeVertexA && currentTriangleEdgeVertexB == nextOutlineEdgeVertexB) ||
-                            (currentTriangleEdgeVertexA == nextOutlineEdgeVertexB && currentTriangleEdgeVertexB == nextOutlineEdgeVertexA))
+                            (currentTriangleEdgeVertexA == nextOutlineEdgeVertexB && currentTriangleEdgeVertexB == nextOutlineEdgeVertexA) ||
+                            (currentTriangleEdgeVertexA == currEdgeVertexA && currentTriangleEdgeVertexB == currEdgeVertexB) ||
+                            (currentTriangleEdgeVertexA == currEdgeVertexB && currentTriangleEdgeVertexB == currEdgeVertexA))
                         {
                             isAdjacentTriangleInOutline = true;
                         }
