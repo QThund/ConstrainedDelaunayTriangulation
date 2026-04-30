@@ -72,6 +72,12 @@ namespace Game.Utils.Triangulation
         
         // Vertices created when adding a constrained edge that crosses existing vertices
         private readonly List<int> m_intermediateVertices = new List<int>();
+        
+        // Vertices along a constrained edge that was added and crossed existing vertices
+        private readonly List<int> m_splitVertices = new List<int>();
+        
+        // Contains the constrained edges that form the outline of the hole after it has been split
+        private readonly List<int> m_augmentedOutline = new List<int>();
 
         /// <summary>
         /// Generates the triangulation of a point cloud that fulfills the Delaunay constraint. It allows the creation of holes in the
@@ -203,21 +209,26 @@ namespace Game.Utils.Triangulation
                 for(int i = 0; i < constrainedEdgeIndices.Count; ++i)
                 {
                     List<int> originalOutline = constrainedEdgeIndices[i];
-                    List<int> augmentedOutline = new List<int>(originalOutline.Count);
-                    List<int> splitVertices = new List<int>();
+                    m_augmentedOutline.Clear();
+
+                    if (m_augmentedOutline.Capacity < originalOutline.Count)
+                    {
+                        m_augmentedOutline.Capacity = originalOutline.Count;
+                    }
 
                     for (int j = 0; j < originalOutline.Count; ++j)
                     {
                         int a = originalOutline[j];
                         int b = originalOutline[(j + 1) % originalOutline.Count];
 
-                        augmentedOutline.Add(a);
-                        splitVertices.Clear();
-                        AddConstrainedEdgeToTriangulation(a, b, splitVertices);
-                        augmentedOutline.AddRange(splitVertices);
+                        m_augmentedOutline.Add(a);
+                        m_splitVertices.Clear();
+                        AddConstrainedEdgeToTriangulation(a, b, m_splitVertices);
+                        m_augmentedOutline.AddRange(m_splitVertices);
                     }
 
-                    constrainedEdgeIndices[i] = augmentedOutline;
+                    constrainedEdgeIndices[i].Clear();
+                    constrainedEdgeIndices[i].AddRange(m_augmentedOutline);
                 }
 
                 // 5.4: Identify all the triangles in the polygon
