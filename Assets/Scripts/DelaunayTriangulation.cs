@@ -69,6 +69,9 @@ namespace Game.Utils.Triangulation
 
         // The bounding box of the main point cloud
         protected Bounds m_mainPointCloudBounds = new Bounds();
+        
+        // Vertices created when adding a constrained edge that crosses existing vertices
+        private readonly List<int> m_intermediateVertices = new List<int>();
 
         /// <summary>
         /// Generates the triangulation of a point cloud that fulfills the Delaunay constraint. It allows the creation of holes in the
@@ -113,7 +116,7 @@ namespace Game.Utils.Triangulation
             {
                 m_trianglesToRemove.Clear();
             }
-
+            
             // 1: Normalization
             m_mainPointCloudBounds = CalculateBoundsWithLeftBottomCornerAtOrigin(inputPoints);
 
@@ -191,13 +194,30 @@ namespace Game.Utils.Triangulation
                     constrainedEdgeIndices.Add(polygonEdgeIndices);
                 }
 
-                // 5.3: Create the constrained edges
+                // 5.3: Create the constrained edges. AddConstrainedEdgeToTriangulation may split the input edge AB at
+                // one or more existing triangulation vertices when the swap-walk cannot insert AB directly. The
+                // polygon outline used by the flood-fill in step 5.4 must be augmented with those split vertices
+                // (in order from A to B), otherwise GetTrianglesInPolygon will look up directed edges like A→B that
+                // no longer exist as a single edge in the triangulation, the flood-fill leaks, and the hole eats
+                // every triangle.
                 for(int i = 0; i < constrainedEdgeIndices.Count; ++i)
                 {
-                    for (int j = 0; j < constrainedEdgeIndices[i].Count - 0; ++j)
+                    List<int> originalOutline = constrainedEdgeIndices[i];
+                    List<int> augmentedOutline = new List<int>(originalOutline.Count);
+                    List<int> splitVertices = new List<int>();
+
+                    for (int j = 0; j < originalOutline.Count; ++j)
                     {
-                        AddConstrainedEdgeToTriangulation(constrainedEdgeIndices[i][j], constrainedEdgeIndices[i][(j + 1) % constrainedEdgeIndices[i].Count]);
+                        int a = originalOutline[j];
+                        int b = originalOutline[(j + 1) % originalOutline.Count];
+
+                        augmentedOutline.Add(a);
+                        splitVertices.Clear();
+                        AddConstrainedEdgeToTriangulation(a, b, splitVertices);
+                        augmentedOutline.AddRange(splitVertices);
                     }
+
+                    constrainedEdgeIndices[i] = augmentedOutline;
                 }
 
                 // 5.4: Identify all the triangles in the polygon
@@ -539,9 +559,51 @@ namespace Game.Utils.Triangulation
         /// <param name="endpointBIndex">The index of the second vertex of the edge, in the existing triangulation.</param>
         private void AddConstrainedEdgeToTriangulation(int endpointAIndex, int endpointBIndex)
         {
+            AddConstrainedEdgeToTriangulation(endpointAIndex, endpointBIndex, null);
+        }
+
+        /// <summary>
+        /// Inserts the constrained edge AB into the triangulation. If it splits AB at one or more existing
+        /// triangulation vertices that lie strictly on the segment, every split vertex is appended to
+        /// <paramref name="splitVerticesAtoB"/> in order from A to B. Pass null when the caller doesn't care about
+        /// the splits (the polygon-outline path uses this to weave the splits into the hole outline before the
+        /// flood-fill, otherwise GetTrianglesInPolygon would look up directed outline edges that no longer exist as
+        /// single edges).
+        /// </summary>
+        private void AddConstrainedEdgeToTriangulation(int endpointAIndex, int endpointBIndex, List<int> splitVerticesAtoB)
+        {
             // Detects if the edge already exists
             if (m_triangleSet.FindTriangleThatContainsEdge(endpointAIndex, endpointBIndex).TriangleIndex != NOT_FOUND)
             {
+                return;
+            }
+
+            // If any existing triangulation vertex lies strictly on segment AB, split the constraint
+            // edge at that vertex before attempting the intersection walk. Without this, the walk enters an infinite cycle
+            // when it reaches the intermediate vertex and cannot find a crossing edge toward B.
+            m_intermediateVertices.Clear();
+            m_triangleSet.FindIntermediateVerticesOnSegment(endpointAIndex, endpointBIndex, m_intermediateVertices);
+            
+            if (m_intermediateVertices.Count > 0)
+            {
+                int prevIndex = endpointAIndex;
+                
+                for (int i = 0; i < m_intermediateVertices.Count; ++i)
+                {
+                    AddConstrainedEdgeToTriangulation(prevIndex, m_intermediateVertices[i], splitVerticesAtoB);
+
+                    if (splitVerticesAtoB != null)
+                    {
+                        splitVerticesAtoB.Add(m_intermediateVertices[i]);
+                    }
+                    
+                    prevIndex = m_intermediateVertices[i];
+                }
+                
+                AddConstrainedEdgeToTriangulation(prevIndex, endpointBIndex, splitVerticesAtoB);
+                
+                m_intermediateVertices.Clear();
+                
                 return;
             }
 
@@ -551,33 +613,52 @@ namespace Game.Utils.Triangulation
             // 5.3.1: Search for the triangle that contains the beginning of the new edge
             int triangleContainingA = m_triangleSet.FindTriangleThatContainsLineEndpoint(endpointAIndex, endpointBIndex);
 
-
             // 5.3.2: Get all the triangle edges intersected by the constrained edge
             List<DelaunayTriangleEdge> intersectedTriangleEdges = new List<DelaunayTriangleEdge>();
             m_triangleSet.GetIntersectingEdges(edgeEndpointA, edgeEndpointB, triangleContainingA, intersectedTriangleEdges);
 
             List<DelaunayTriangleEdge> newEdges = new List<DelaunayTriangleEdge>();
 
+            // Counts consecutive iterations in which no swap was made (all queued edges formed non-convex quads).
+            // If this reaches the list size, every remaining edge has been tried once without progress — the algorithm
+            // is stuck. This cannot happen for valid (non-degenerate) input, so we break.
+            int noProgressCount = 0;
+
             while (intersectedTriangleEdges.Count > 0)
             {
                 DelaunayTriangleEdge currentIntersectedTriangleEdge = intersectedTriangleEdges[intersectedTriangleEdges.Count - 1];
                 intersectedTriangleEdges.RemoveAt(intersectedTriangleEdges.Count - 1);
 
-                // 5.3.3: Form quadrilaterals and swap intersected edges
-                // Deduces the data for both triangles
-                currentIntersectedTriangleEdge = m_triangleSet.FindTriangleThatContainsEdge(currentIntersectedTriangleEdge.EdgeVertexA, currentIntersectedTriangleEdge.EdgeVertexB);
+                // 5.3.3: Form quadrilaterals and swap intersected edges.
+                // The cached (TriangleIndex, EdgeIndex) is a fast hint, not a fact: any swap on a quadrilateral that
+                // happens to share this triangle overwrites one of its vertices, so the slot may now hold a different
+                // edge. When that happens the geometric edge (vA → vB) has not necessarily been destroyed — it can
+                // simply have moved to a different (triangle, slot) pair. Sloan's original algorithm keys the queue
+                // on (vA, vB) and re-resolves each iteration; the slot caching here is just a performance hint, with
+                // a directed-edge search as the authoritative fallback. Dropping on stale (the previous behaviour)
+                // could lose the last unresolved intersection and leave AB missing after the loop terminates.
+                if (!m_triangleSet.IsEdgeStillAt(currentIntersectedTriangleEdge.TriangleIndex,
+                                                 currentIntersectedTriangleEdge.EdgeIndex,
+                                                 currentIntersectedTriangleEdge.EdgeVertexA,
+                                                 currentIntersectedTriangleEdge.EdgeVertexB))
+                {
+                    DelaunayTriangleEdge relocated = m_triangleSet.FindTriangleThatContainsEdge(currentIntersectedTriangleEdge.EdgeVertexA, currentIntersectedTriangleEdge.EdgeVertexB);
+                    
+                    if (relocated.TriangleIndex == NOT_FOUND)
+                    {
+                        // Genuinely destroyed by an earlier swap — its replacement was already enqueued by that swap.
+                        continue;
+                    }
+                    
+                    currentIntersectedTriangleEdge = new DelaunayTriangleEdge(relocated.TriangleIndex, relocated.EdgeIndex, currentIntersectedTriangleEdge.EdgeVertexA, currentIntersectedTriangleEdge.EdgeVertexB);
+                }
+
                 DelaunayTriangle intersectedTriangle = m_triangleSet.GetTriangle(currentIntersectedTriangleEdge.TriangleIndex);
                 DelaunayTriangle oppositeTriangle = m_triangleSet.GetTriangle(intersectedTriangle.adjacent[currentIntersectedTriangleEdge.EdgeIndex]);
                 Triangle2D trianglePoints = m_triangleSet.GetTrianglePoints(currentIntersectedTriangleEdge.TriangleIndex);
 
                 // Gets the opposite vertex of adjacent triangle, knowing the fisrt vertex of the shared edge
                 int oppositeVertex = NOT_FOUND;
-
-                //List<int> debugP = intersectedTriangle.DebugP;
-                //List<int> debugA = intersectedTriangle.DebugAdjacent;
-                //List<int> debugP2 = oppositeTriangle.DebugP;
-                //List<int> debugA2 = oppositeTriangle.DebugAdjacent;
-
                 int oppositeSharedEdgeVertex = NOT_FOUND; // The first vertex in the shared edge of the opposite triangle
 
                 for (int j = 0; j < 3; ++j)
@@ -594,6 +675,8 @@ namespace Game.Utils.Triangulation
 
                 if (MathUtils.IsQuadrilateralConvex(trianglePoints.p0, trianglePoints.p1, trianglePoints.p2, oppositePoint))
                 {
+                    noProgressCount = 0;
+
                     // Swap
                     int notInEdgeTriangleVertex = (currentIntersectedTriangleEdge.EdgeIndex + 2) % 3;
                     SwapEdges(currentIntersectedTriangleEdge.TriangleIndex, intersectedTriangle, notInEdgeTriangleVertex, oppositeTriangle, oppositeSharedEdgeVertex);
@@ -601,19 +684,13 @@ namespace Game.Utils.Triangulation
                     // Refreshes triangle data after swapping
                     intersectedTriangle = m_triangleSet.GetTriangle(currentIntersectedTriangleEdge.TriangleIndex);
 
-                    //oppositeTriangle = m_triangles.GetTriangle(intersectedTriangle.adjacent[(currentIntersectedTriangleEdge.EdgeIndex + 2) % 3]);
-                    //debugP = intersectedTriangle.DebugP;
-                    //debugA = intersectedTriangle.DebugAdjacent;
-                    //debugP2 = oppositeTriangle.DebugP;
-                    //debugA2 = oppositeTriangle.DebugAdjacent;
-
                     // Check new diagonal against the intersecting edge
                     Vector2 intersectionPoint;
                     int newTriangleSharedEdgeVertex = (currentIntersectedTriangleEdge.EdgeIndex + 2) % 3; // Read SwapEdges method to understand the +2
                     Vector2 newTriangleSharedEdgePointA = m_triangleSet.GetPointByIndex(intersectedTriangle.p[newTriangleSharedEdgeVertex]);
                     Vector2 newTriangleSharedEdgePointB = m_triangleSet.GetPointByIndex(intersectedTriangle.p[(newTriangleSharedEdgeVertex  + 1) % 3]);
 
-                    DelaunayTriangleEdge newEdge = new DelaunayTriangleEdge(NOT_FOUND, NOT_FOUND, intersectedTriangle.p[newTriangleSharedEdgeVertex], intersectedTriangle.p[(newTriangleSharedEdgeVertex + 1) % 3]);
+                    DelaunayTriangleEdge newEdge = new DelaunayTriangleEdge(currentIntersectedTriangleEdge.TriangleIndex, newTriangleSharedEdgeVertex, intersectedTriangle.p[newTriangleSharedEdgeVertex], intersectedTriangle.p[(newTriangleSharedEdgeVertex + 1) % 3]);
 
                     if (newTriangleSharedEdgePointA != edgeEndpointB && newTriangleSharedEdgePointB != edgeEndpointB && // Watch out! It thinks the line intersects with the edge when an endpoint coincides with a triangle vertex, this problem is avoided thanks to this conditions
                         newTriangleSharedEdgePointA != edgeEndpointA && newTriangleSharedEdgePointB != edgeEndpointA &&
@@ -629,8 +706,18 @@ namespace Game.Utils.Triangulation
                 }
                 else
                 {
-                    // Back to the list
+                    // Back to the list, quad is not yet convex; other swaps may make it so
                     intersectedTriangleEdges.Insert(0, currentIntersectedTriangleEdge);
+                    ++noProgressCount;
+
+                    if (noProgressCount > intersectedTriangleEdges.Count)
+                    {
+                        // Every remaining queued edge belongs to a quadrilateral that is non-convex no matter the swap order.
+                        // This cannot occur for valid (non-degenerate) input; if it does, the input has coincident or near-coincident points that the upstream dedup
+                        // missed. Bail out (the alternative is to spin forever).
+                        Debug.LogError("AddConstrainedEdgeToTriangulation: no swap possible for any remaining intersected edge on constraint (" + endpointAIndex + " -> " + endpointBIndex + "). Input is degenerate.");
+                        break;
+                    }
                 }
             }
 
@@ -647,8 +734,33 @@ namespace Game.Utils.Triangulation
                     continue;
                 }
 
-                // Deduces the data for both triangles
-                DelaunayTriangleEdge currentEdge = m_triangleSet.FindTriangleThatContainsEdge(newEdges[i].EdgeVertexA, newEdges[i].EdgeVertexB);
+                // Deduces the data for both triangles. Prefer the cached (triangle, local-edge) slot from step 5.3.3
+                // via IsEdgeStillAt; fall back to a forward search, then a reverse search, before giving up. The
+                // reverse search is required because every internal edge is stored A→B in one adjacent triangle and
+                // B→A in the other — a prior swap in this same loop can rebuild the triangle that held our captured
+                // direction, leaving only the opposite one. If neither direction is present the edge was destroyed
+                // by an earlier swap (or newEdges held a duplicate) and there is nothing left to optimise.
+                DelaunayTriangleEdge currentEdge;
+                
+                if (m_triangleSet.IsEdgeStillAt(newEdges[i].TriangleIndex, newEdges[i].EdgeIndex, newEdges[i].EdgeVertexA, newEdges[i].EdgeVertexB))
+                {
+                    currentEdge = newEdges[i];
+                }
+                else
+                {
+                    currentEdge = m_triangleSet.FindTriangleThatContainsEdge(newEdges[i].EdgeVertexA, newEdges[i].EdgeVertexB);
+                    
+                    if (currentEdge.TriangleIndex == NOT_FOUND)
+                    {
+                        currentEdge = m_triangleSet.FindTriangleThatContainsEdge(newEdges[i].EdgeVertexB, newEdges[i].EdgeVertexA);
+                    }
+                    
+                    if (currentEdge.TriangleIndex == NOT_FOUND)
+                    {
+                        continue;
+                    }
+                }
+                
                 DelaunayTriangle currentEdgeTriangle = m_triangleSet.GetTriangle(currentEdge.TriangleIndex);
                 int triangleVertexNotShared = (currentEdge.EdgeIndex + 2) % 3;
                 Vector2 trianglePointNotShared = m_triangleSet.GetPointByIndex(currentEdgeTriangle.p[triangleVertexNotShared]);

@@ -232,8 +232,27 @@ namespace Game.Utils.Triangulation
             // First it gets all the triangles of the outline
             for (int i = 0; i < polygonOutline.Count; ++i)
             {
+                int outlineVertexA = polygonOutline[i];
+                int outlineVertexB = polygonOutline[(i + 1) % polygonOutline.Count];
+
+                // Skip zero-length outline edges. Two consecutive hole vertices can resolve to the same triangulation
+                // point index when AddPointToTriangulation dedupes near-coincident points via GetIndexOfPoint.
+                if (outlineVertexA == outlineVertexB)
+                {
+                    continue;
+                }
+
                 // For every edge, it gets the inner triangle that contains such edge
-                DelaunayTriangleEdge triangleEdge = FindTriangleThatContainsEdge(polygonOutline[i], polygonOutline[(i + 1) % polygonOutline.Count]);
+                DelaunayTriangleEdge triangleEdge = FindTriangleThatContainsEdge(outlineVertexA, outlineVertexB);
+
+                // The directed edge may be absent if AddConstrainedEdgeToTriangulation bailed out (e.g. its no-progress
+                // assert path on near-collinear input). Skipping here prevents the negative-index OOB at the adjacency
+                // lookup below; the flood-fill may leak through the gap, but the upstream insertion already logged.
+                if (triangleEdge.TriangleIndex == NOT_FOUND)
+                {
+                    UnityEngine.Debug.LogWarning($"GetTrianglesInPolygon: directed outline edge ({outlineVertexA} -> {outlineVertexB}) is not present in the triangulation. The corresponding constrained edge was not fully inserted; flood-fill may produce an incorrect triangle set for this polygon.");
+                    continue;
+                }
 
                 // A triangle may form a corner, with 2 consecutive outline edges. This avoids adding it twice
                 if(outputTrianglesInPolygon.Count > 0 &&
@@ -348,7 +367,7 @@ namespace Game.Utils.Triangulation
                         {
                             hasCrossedEdge = true;
 
-                            intersectingEdges.Add(new DelaunayTriangleEdge(NOT_FOUND, NOT_FOUND, m_triangleVertices[triangleIndex * 3 + i], m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]));
+                            intersectingEdges.Add(new DelaunayTriangleEdge(triangleIndex, i, m_triangleVertices[triangleIndex * 3 + i], m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]));
 
                             //Debug.DrawLine(m_points[m_triangleVertices[triangleIndex * 3 + i]], m_points[m_triangleVertices[triangleIndex * 3 + (i + 1) % 3]], Color.yellow, 10.0f);
                             //const float xlineLength = 0.008f;
@@ -367,6 +386,14 @@ namespace Game.Utils.Triangulation
                 // Continue searching at a different adjacent triangle
                 if (!hasCrossedEdge)
                 {
+                    // tentativeAdjacentTriangle == NO_ADJACENT_TRIANGLE means B was not to the right of any edge
+                    // and was not found as a vertex. In a valid triangulation where no intermediate vertex lies on
+                    // AB (guaranteed by FindIntermediateVerticesOnSegment), this state is unreachable.
+                    if (tentativeAdjacentTriangle == NO_ADJACENT_TRIANGLE)
+                    {
+                        Debug.LogWarning("GetIntersectingEdges: B is not to the right of any edge and not a vertex of the current triangle. This indicates a broken triangulation adjacency invariant or a constraint edge that was not split at an intermediate vertex. Is any of the vertices that define the hole outside of the main convex hull?");
+                    }
+
                     triangleIndex = m_adjacentTriangles[triangleIndex * 3 + tentativeAdjacentTriangle];
                 }
             }
@@ -426,6 +453,28 @@ namespace Game.Utils.Triangulation
             }
 
             return foundTriangle;
+        }
+
+        /// <summary>
+        /// Constant-time check for whether the given (triangle, local edge) slot still references the directed edge
+        /// (edgeVertexA → edgeVertexB). Used to detect when an edge captured earlier in a swap loop has been
+        /// destroyed by an intermediate swap, so the caller can skip it without falling back to a full search.
+        /// </summary>
+        /// <param name="triangleIndex">The triangle index to verify.</param>
+        /// <param name="edgeIndex">The local edge index in the triangle (0, 1 or 2).</param>
+        /// <param name="edgeVertexA">The expected first vertex of the directed edge.</param>
+        /// <param name="edgeVertexB">The expected second vertex of the directed edge.</param>
+        /// <returns>True if the slot still holds the directed edge; false otherwise.</returns>
+        public bool IsEdgeStillAt(int triangleIndex, int edgeIndex, int edgeVertexA, int edgeVertexB)
+        {
+            if (triangleIndex < 0 || triangleIndex >= TriangleCount || 
+                edgeIndex < 0 || edgeIndex > 2)
+            {
+                return false;
+            }
+
+            return m_triangleVertices[triangleIndex * 3 + edgeIndex] == edgeVertexA &&
+                   m_triangleVertices[triangleIndex * 3 + (edgeIndex + 1) % 3] == edgeVertexB;
         }
 
         /// <summary>
@@ -504,6 +553,75 @@ namespace Game.Utils.Triangulation
             }
             
             return foundTriangle;
+        }
+
+        /// <summary>
+        /// Finds all existing triangulation vertices, other than A and B, that lie strictly on the segment AB.
+        /// The output list is sorted by ascending distance from A, so iterating it in order yields the sub-segments A→P0→P1→...→B that together tile the original constrained edge.
+        /// </summary>
+        /// <remarks>
+        /// If a constraint edge passes through an existing vertex P_k, the edge must be split into L_ik and L_kj before the intersection walk is attempted, otherwise the walk can
+        /// enter an infinite cycle when it reaches P_k and finds no crossing edge toward B.
+        /// </remarks>
+        /// <param name="indexA">Index of the segment start vertex in the points list.</param>
+        /// <param name="indexB">Index of the segment end vertex in the points list.</param>
+        /// <param name="output">Receives the sorted intermediate vertex indices. Not cleared on entry.</param>
+        public void FindIntermediateVerticesOnSegment(int indexA, int indexB, List<int> output)
+        {
+            Vector2 a = m_points[indexA];
+            Vector2 b = m_points[indexB];
+            Vector2 ab = b - a;
+            float abLenSq = ab.x * ab.x + ab.y * ab.y;
+
+            if (abLenSq == 0.0f)
+            {
+                return;
+            }
+
+            for (int i = 0; i < m_points.Count; ++i)
+            {
+                if (i == indexA || i == indexB)
+                {
+                    continue;
+                }
+
+                Vector2 ap = m_points[i] - a;
+                float apLenSq = ap.x * ap.x + ap.y * ap.y;
+
+                if (apLenSq == 0.0f)
+                {
+                    continue; // P coincides with A; defensive — already filtered by indexA equality above
+                }               
+
+                // Collinearity check matched to MathUtils.IsPointToTheRightOfEdge: |sin θ| > 1e-4 on normalised vectors.
+                // cross² = |AB|²·|AP|²·sin²θ, so the equivalent un-normalised form is cross² > 1e-8 · |AB|² · |AP|².
+                float cross = ab.x * ap.y - ab.y * ap.x;
+                
+                if (cross * cross > 1e-8f * abLenSq * apLenSq)
+                {
+                    continue;
+                }
+
+                // Strictly-between check: project AP onto AB and verify 0 < t < 1
+                float proj = ap.x * ab.x + ap.y * ab.y;
+                
+                if (proj <= 0.0f || proj >= abLenSq)
+                {
+                    continue;
+                }
+
+                output.Add(i);
+            }
+
+            // Sort by squared distance from A (monotone proxy for distance, so no sqrt needed)
+            output.Sort((i1, i2) =>
+                {
+                    Vector2 ap1 = m_points[i1] - a;
+                    Vector2 ap2 = m_points[i2] - a;
+                    float d1 = ap1.x * ap1.x + ap1.y * ap1.y;
+                    float d2 = ap2.x * ap2.x + ap2.y * ap2.y;
+                    return d1.CompareTo(d2);
+                });
         }
 
         /// <summary>

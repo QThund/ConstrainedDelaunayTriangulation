@@ -41,7 +41,7 @@ public class DelaunayTriangulationTester : MonoBehaviour
 
     [Tooltip("The mesh that displays the output triangles.")]
     public MeshFilter VisualRepresentation;
-
+    
     [Tooltip("Enables tesselation (before calculating constrained edges) when greater than zero. It subdivides the triangles until each of them has an area smaller than this value.")]
     public float TesselationMaximumTriangleArea = 0.0f;
 
@@ -61,6 +61,14 @@ public class DelaunayTriangulationTester : MonoBehaviour
         if (ConstrainedEdges != null)
         {
             ExtractPointsFromCollider(ConstrainedEdges, constrainedEdgePoints);
+        }
+
+        for (int i = 0; i < constrainedEdgePoints.Count; ++i)
+        {
+            if (SignedArea(constrainedEdgePoints[i]) < 0.0f)
+            {
+                constrainedEdgePoints[i].Reverse();
+            }
         }
 
         m_outputTriangles.Clear();
@@ -139,6 +147,20 @@ public class DelaunayTriangulationTester : MonoBehaviour
         mesh.SetVertices(vertices);
         mesh.SetIndices(indices, MeshTopology.Triangles, 0);
         return mesh;
+    }
+
+    private static float SignedArea(List<Vector2> polygon)
+    {
+        float sum = 0.0f;
+
+        for (int i = 0; i < polygon.Count; ++i)
+        {
+            Vector2 a = polygon[i];
+            Vector2 b = polygon[(i + 1) % polygon.Count];
+            sum += a.x * b.y - b.x * a.y;
+        }
+
+        return sum * 0.5f;
     }
 
     private void ExtractPointsFromCollider(PolygonCollider2D collider, List<Vector2> outputPoints)
