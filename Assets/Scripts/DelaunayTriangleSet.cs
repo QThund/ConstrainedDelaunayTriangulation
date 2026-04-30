@@ -283,7 +283,9 @@ namespace Game.Utils.Triangulation
                         if ((currentTriangleEdgeVertexA == previousOutlineEdgeVertexA && currentTriangleEdgeVertexB == previousOutlineEdgeVertexB) ||
                             (currentTriangleEdgeVertexA == previousOutlineEdgeVertexB && currentTriangleEdgeVertexB == previousOutlineEdgeVertexA) ||
                             (currentTriangleEdgeVertexA == nextOutlineEdgeVertexA && currentTriangleEdgeVertexB == nextOutlineEdgeVertexB) ||
-                            (currentTriangleEdgeVertexA == nextOutlineEdgeVertexB && currentTriangleEdgeVertexB == nextOutlineEdgeVertexA))
+                            (currentTriangleEdgeVertexA == nextOutlineEdgeVertexB && currentTriangleEdgeVertexB == nextOutlineEdgeVertexA) ||
+                            (currentTriangleEdgeVertexA == outlineVertexA && currentTriangleEdgeVertexB == outlineVertexB) ||
+                            (currentTriangleEdgeVertexA == outlineVertexB && currentTriangleEdgeVertexB == outlineVertexA))
                         {
                             isAdjacentTriangleInOutline = true;
                         }
