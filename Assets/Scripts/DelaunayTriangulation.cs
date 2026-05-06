@@ -696,7 +696,6 @@ namespace Game.Utils.Triangulation
                     intersectedTriangle = m_triangleSet.GetTriangle(currentIntersectedTriangleEdge.TriangleIndex);
 
                     // Check new diagonal against the intersecting edge
-                    Vector2 intersectionPoint;
                     int newTriangleSharedEdgeVertex = (currentIntersectedTriangleEdge.EdgeIndex + 2) % 3; // Read SwapEdges method to understand the +2
                     Vector2 newTriangleSharedEdgePointA = m_triangleSet.GetPointByIndex(intersectedTriangle.p[newTriangleSharedEdgeVertex]);
                     Vector2 newTriangleSharedEdgePointB = m_triangleSet.GetPointByIndex(intersectedTriangle.p[(newTriangleSharedEdgeVertex  + 1) % 3]);
@@ -705,7 +704,7 @@ namespace Game.Utils.Triangulation
 
                     if (newTriangleSharedEdgePointA != edgeEndpointB && newTriangleSharedEdgePointB != edgeEndpointB && // Watch out! It thinks the line intersects with the edge when an endpoint coincides with a triangle vertex, this problem is avoided thanks to this conditions
                         newTriangleSharedEdgePointA != edgeEndpointA && newTriangleSharedEdgePointB != edgeEndpointA &&
-                        MathUtils.IntersectionBetweenLines(edgeEndpointA, edgeEndpointB, newTriangleSharedEdgePointA, newTriangleSharedEdgePointB, out intersectionPoint))
+                        MathUtils.IntersectionBetweenLines(edgeEndpointA, edgeEndpointB, newTriangleSharedEdgePointA, newTriangleSharedEdgePointB, out _))
                     {
                         // New triangles edge still intersects with the constrained edge, so it is returned to the list
                         intersectedTriangleEdges.Insert(0, newEdge);
